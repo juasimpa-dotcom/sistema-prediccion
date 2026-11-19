@@ -1,0 +1,1 @@
+"""Minimax (decisión adversarial, opcional)."""
