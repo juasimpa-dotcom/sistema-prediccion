@@ -11,7 +11,7 @@ acciones y explica sus decisiones.
 | ---- | ------- | ------ |
 | 1 | Configuración base y generación del dataset | Completada |
 | 2 | Preprocesamiento y modelo de Machine Learning | Completada |
-| 3 | Sistema experto (reglas, factores de certeza, lógica difusa) | Pendiente |
+| 3 | Sistema experto (reglas, factores de certeza, lógica difusa) | En curso (reglas y motor completados) |
 | 4 | Búsqueda de planes de acción | Pendiente |
 | 5 | Explicabilidad, API y dashboard | Pendiente |
 
@@ -114,12 +114,45 @@ resultado = predictor.predecir({"historial": historial_de_la_serie})
 print(resultado.valor_predicho, resultado.confianza)
 ```
 
-Calidad y pruebas:
+## Uso de la Fase 3
+
+El sistema experto es independiente del dominio: el motor solo conoce reglas y
+hechos. Las 30 reglas retail se declaran en `expert_system/reglas.json` y se
+validan al cargarse; también pueden construirse como lista de objetos `Regla`.
+
+Demostración completa (caso, traza y explicaciones):
+
+```powershell
+python -m expert_system.demo
+```
+
+Uso programático:
+
+```python
+from expert_system.base_conocimientos import BaseConocimientos
+from expert_system.demo import hechos_del_caso
+from expert_system.motor_inferencia import MotorInferencia
+from expert_system.explicacion import explicar
+
+base = BaseConocimientos.desde_json()
+memoria = hechos_del_caso()
+motor = MotorInferencia(base, memoria)
+traza = motor.encadenar_adelante()
+accion = memoria.consultar("accion_recomendada")
+print(explicar("accion_recomendada", accion.valor, base, traza, memoria).a_texto())
+```
+
+El razonamiento inexacto usa factores de certeza MYCIN: `min` para
+conjunciones, `max` para disyunciones, producto para propagar una regla y las
+fórmulas de combinación para evidencia convergente. El encadenamiento hacia
+atrás puede pedir datos al proveedor y explicar cada pregunta.
+
+Calidad y pruebas (incluye cobertura del sistema experto):
 
 ```powershell
 black --check .
 ruff check .
-pytest
+pytest --cov=expert_system --cov-report=term-missing
 ```
 
 ## Dataset generado

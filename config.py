@@ -409,3 +409,13 @@ CONFIANZA_MAXIMA: Final[float] = 0.98
 
 # Tolerancia para evitar divisiones por cero en métricas y confianza.
 EPSILON: Final[float] = 1e-9
+
+# ---------------------------------------------------------------------------
+# Parámetros del sistema experto (Fase 3)
+# ---------------------------------------------------------------------------
+DIR_EXPERTO: Final[Path] = RAIZ_PROYECTO / "expert_system"
+ARCHIVO_REGLAS_EXPERTO: Final[Path] = DIR_EXPERTO / "reglas.json"
+VERSION_BASE_CONOCIMIENTOS: Final[str] = "3.0.0"
+
+# Una regla solo se dispara cuando la certeza de su premisa alcanza este valor.
+UMBRAL_CF_EXPERTO: Final[float] = 0.20

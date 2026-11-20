@@ -1,0 +1,474 @@
+{
+  "version": "3.0.0",
+  "reglas": [
+    {
+      "id": "D01",
+      "descripcion": "La cobertura de stock es baja y las ventas cayeron: falta de inventario",
+      "categoria": "diagnostico",
+      "prioridad": 80,
+      "fc": 0.9,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "stock_cobertura", "operador": "menor_que", "valor": 0.35},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 8}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "stock_critico"}
+    },
+    {
+      "id": "D02",
+      "descripcion": "Desabastecimiento severo de un producto perecible de alta rotación",
+      "categoria": "diagnostico",
+      "prioridad": 95,
+      "fc": 0.95,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "stock_cobertura", "operador": "menor_que", "valor": 0.18},
+          {"atributo": "es_perecible", "operador": "verdadero", "valor": true},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 5}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "stock_critico"}
+    },
+    {
+      "id": "D03",
+      "descripcion": "Merma elevada en perecibles: se pierde producto antes de venderlo",
+      "categoria": "diagnostico",
+      "prioridad": 78,
+      "fc": 0.85,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "merma_pct", "operador": "mayor_que", "valor": 12},
+          {"atributo": "es_perecible", "operador": "verdadero", "valor": true}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "merma_alta"}
+    },
+    {
+      "id": "D04",
+      "descripcion": "El calor incrementa la merma y deja menos unidades vendibles",
+      "categoria": "diagnostico",
+      "prioridad": 70,
+      "fc": 0.8,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "merma_pct", "operador": "mayor_que", "valor": 9},
+          {"atributo": "temperatura_media", "operador": "mayor_que", "valor": 15}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "merma_alta"}
+    },
+    {
+      "id": "D05",
+      "descripcion": "Sin promoción ni feriado, la caída de ventas apunta a falta de estímulo comercial",
+      "categoria": "diagnostico",
+      "prioridad": 68,
+      "fc": 0.78,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "en_promocion", "operador": "falso", "valor": false},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 10},
+          {"atributo": "es_feriado", "operador": "falso", "valor": false}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "falta_promocion"}
+    },
+    {
+      "id": "D06",
+      "descripcion": "La afluencia está por debajo del promedio de la sucursal",
+      "categoria": "diagnostico",
+      "prioridad": 76,
+      "fc": 0.86,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "afluencia_rel", "operador": "menor_que", "valor": 0.85},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 8}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "baja_afluencia"}
+    },
+    {
+      "id": "D07",
+      "descripcion": "Precio por encima de la competencia sin promoción explica la pérdida de clientes",
+      "categoria": "diagnostico",
+      "prioridad": 74,
+      "fc": 0.82,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "precio_vs_competencia", "operador": "mayor_que", "valor": 1.08},
+          {"atributo": "en_promocion", "operador": "falso", "valor": false},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 6}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "competencia_precios"}
+    },
+    {
+      "id": "D08",
+      "descripcion": "Temporada baja con inventario suficiente: caída estacional de la demanda",
+      "categoria": "diagnostico",
+      "prioridad": 60,
+      "fc": 0.75,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "temporada", "operador": "igual", "valor": "baja"},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 12},
+          {"atributo": "stock_cobertura", "operador": "mayor_o_igual", "valor": 0.6}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "estacionalidad"}
+    },
+    {
+      "id": "D09",
+      "descripcion": "En temporada alta, con afluencia normal y sin promoción, el cliente no compra",
+      "categoria": "diagnostico",
+      "prioridad": 58,
+      "fc": 0.7,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "temporada", "operador": "igual", "valor": "alta"},
+          {"atributo": "ventas_caida_pct", "operador": "mayor_que", "valor": 10},
+          {"atributo": "afluencia_rel", "operador": "mayor_o_igual", "valor": 0.95},
+          {"atributo": "en_promocion", "operador": "falso", "valor": false}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "estacionalidad"}
+    },
+    {
+      "id": "D10",
+      "descripcion": "Desabastecimiento extremo o merma descontrolada: operación crítica",
+      "categoria": "diagnostico",
+      "prioridad": 90,
+      "fc": 0.88,
+      "condiciones": {
+        "operador": "or",
+        "condiciones": [
+          {"atributo": "stock_cobertura", "operador": "menor_que", "valor": 0.25},
+          {"atributo": "merma_pct", "operador": "mayor_que", "valor": 18}
+        ]
+      },
+      "conclusion": {"atributo": "causa_ventas_bajas", "valor": "operacion_critica"}
+    },
+    {
+      "id": "R01",
+      "descripcion": "Cumplimiento esperado muy por debajo del 85 %: riesgo alto",
+      "categoria": "riesgo",
+      "prioridad": 100,
+      "fc": 0.95,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "cumplimiento_esperado_pct", "operador": "menor_que", "valor": 85}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "R02",
+      "descripcion": "Una causa operativa con cumplimiento menor al 95 % agrava el riesgo",
+      "categoria": "riesgo",
+      "prioridad": 92,
+      "fc": 0.88,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "cumplimiento_esperado_pct", "operador": "menor_que", "valor": 95},
+          {
+            "atributo": "causa_ventas_bajas",
+            "operador": "en",
+            "valor": ["stock_critico", "merma_alta", "operacion_critica"]
+          }
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "R03",
+      "descripcion": "Una causa de demanda o competencia también amenaza la meta",
+      "categoria": "riesgo",
+      "prioridad": 86,
+      "fc": 0.82,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "cumplimiento_esperado_pct", "operador": "menor_que", "valor": 95},
+          {
+            "atributo": "causa_ventas_bajas",
+            "operador": "en",
+            "valor": ["baja_afluencia", "competencia_precios", "falta_promocion"]
+          }
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "R04",
+      "descripcion": "Cumplimiento entre 90 % y 100 %: riesgo medio",
+      "categoria": "riesgo",
+      "prioridad": 70,
+      "fc": 0.75,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "cumplimiento_esperado_pct", "operador": "menor_que", "valor": 100},
+          {"atributo": "cumplimiento_esperado_pct", "operador": "mayor_o_igual", "valor": 90}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "medio"}
+    },
+    {
+      "id": "R05",
+      "descripcion": "Cumplimiento adecuado con stock sano: riesgo bajo",
+      "categoria": "riesgo",
+      "prioridad": 68,
+      "fc": 0.85,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "cumplimiento_esperado_pct", "operador": "mayor_o_igual", "valor": 102},
+          {"atributo": "stock_cobertura", "operador": "mayor_o_igual", "valor": 0.6}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "bajo"}
+    },
+    {
+      "id": "R06",
+      "descripcion": "Temporada alta sin promoción y meta ajustada: riesgo alto",
+      "categoria": "riesgo",
+      "prioridad": 80,
+      "fc": 0.78,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "temporada", "operador": "igual", "valor": "alta"},
+          {"atributo": "en_promocion", "operador": "falso", "valor": false},
+          {"atributo": "cumplimiento_esperado_pct", "operador": "menor_que", "valor": 100}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "R07",
+      "descripcion": "Merma extrema en perecibles con meta en riesgo",
+      "categoria": "riesgo",
+      "prioridad": 88,
+      "fc": 0.85,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "merma_pct", "operador": "mayor_que", "valor": 15},
+          {"atributo": "es_perecible", "operador": "verdadero", "valor": true},
+          {"atributo": "cumplimiento_esperado_pct", "operador": "menor_que", "valor": 100}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "R08",
+      "descripcion": "Meta superada, merma controlada y stock suficiente: sin riesgo",
+      "categoria": "riesgo",
+      "prioridad": 72,
+      "fc": 0.9,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "cumplimiento_esperado_pct", "operador": "mayor_o_igual", "valor": 108},
+          {"atributo": "merma_pct", "operador": "menor_o_igual", "valor": 6},
+          {"atributo": "stock_cobertura", "operador": "mayor_o_igual", "valor": 0.8}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "nulo"}
+    },
+    {
+      "id": "A01",
+      "descripcion": "Reposición urgente ante desabastecimiento y riesgo alto",
+      "categoria": "recomendacion",
+      "prioridad": 100,
+      "fc": 0.95,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "alto"},
+          {"atributo": "causa_ventas_bajas", "operador": "igual", "valor": "stock_critico"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reponer_stock_urgente"}
+    },
+    {
+      "id": "A02",
+      "descripcion": "Reponer inventario antes de que la cobertura crítica se agrave",
+      "categoria": "recomendacion",
+      "prioridad": 75,
+      "fc": 0.8,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "stock_cobertura", "operador": "menor_que", "valor": 0.5},
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "medio"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reponer_stock"}
+    },
+    {
+      "id": "A03",
+      "descripcion": "Lanzar promoción cuando no hubo estímulo comercial y la meta está en riesgo",
+      "categoria": "recomendacion",
+      "prioridad": 95,
+      "fc": 0.92,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "causa_ventas_bajas", "operador": "igual", "valor": "falta_promocion"},
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "alto"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "lanzar_promocion"}
+    },
+    {
+      "id": "A04",
+      "descripcion": "Promoción defensiva frente a precios de la competencia",
+      "categoria": "recomendacion",
+      "prioridad": 90,
+      "fc": 0.86,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "causa_ventas_bajas", "operador": "igual", "valor": "competencia_precios"},
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "alto"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "lanzar_promocion"}
+    },
+    {
+      "id": "A05",
+      "descripcion": "Reforzar personal cuando hay mucha afluencia y la dotación es baja",
+      "categoria": "recomendacion",
+      "prioridad": 88,
+      "fc": 0.85,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "afluencia_rel", "operador": "mayor_que", "valor": 0.95},
+          {"atributo": "personal_rel", "operador": "menor_que", "valor": 0.8},
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "alto"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reforzar_personal"}
+    },
+    {
+      "id": "A06",
+      "descripcion": "Reforzar turnos en temporada alta con feriado y personal justo",
+      "categoria": "recomendacion",
+      "prioridad": 82,
+      "fc": 0.8,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "temporada", "operador": "igual", "valor": "alta"},
+          {"atributo": "personal_rel", "operador": "menor_que", "valor": 0.85},
+          {"atributo": "es_feriado", "operador": "verdadero", "valor": true}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reforzar_personal"}
+    },
+    {
+      "id": "A07",
+      "descripcion": "Reducir el pedido de perecibles si hay merma alta en temporada baja",
+      "categoria": "recomendacion",
+      "prioridad": 93,
+      "fc": 0.9,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "causa_ventas_bajas", "operador": "igual", "valor": "merma_alta"},
+          {"atributo": "temporada", "operador": "igual", "valor": "baja"},
+          {"atributo": "es_perecible", "operador": "verdadero", "valor": true}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reducir_pedido_perecible"}
+    },
+    {
+      "id": "A08",
+      "descripcion": "Merma extrema: recortar de inmediato el pedido de perecibles",
+      "categoria": "recomendacion",
+      "prioridad": 91,
+      "fc": 0.88,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "merma_pct", "operador": "mayor_que", "valor": 18},
+          {"atributo": "es_perecible", "operador": "verdadero", "valor": true}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reducir_pedido_perecible"}
+    },
+    {
+      "id": "A09",
+      "descripcion": "Reasignar inventario desde otra sucursal con excedentes",
+      "categoria": "recomendacion",
+      "prioridad": 89,
+      "fc": 0.87,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "stock_cobertura", "operador": "menor_que", "valor": 0.35},
+          {"atributo": "hay_excedente_en_otra_sucursal", "operador": "verdadero", "valor": true}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reasignar_inventario"}
+    },
+    {
+      "id": "A10",
+      "descripcion": "Si el reabastecimiento es lento, traer stock de otra sucursal",
+      "categoria": "recomendacion",
+      "prioridad": 87,
+      "fc": 0.84,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "causa_ventas_bajas", "operador": "igual", "valor": "stock_critico"},
+          {"atributo": "reabastecimiento_tardia", "operador": "verdadero", "valor": true}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reasignar_inventario"}
+    },
+    {
+      "id": "A11",
+      "descripcion": "Con riesgo bajo y stock suficiente, mantener el plan de compras",
+      "categoria": "recomendacion",
+      "prioridad": 60,
+      "fc": 0.8,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "bajo"},
+          {"atributo": "stock_cobertura", "operador": "mayor_o_igual", "valor": 0.6}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "mantener_plan"}
+    },
+    {
+      "id": "A12",
+      "descripcion": "Ajustar precios ante competencia con riesgo controlado",
+      "categoria": "recomendacion",
+      "prioridad": 65,
+      "fc": 0.78,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "causa_ventas_bajas", "operador": "igual", "valor": "competencia_precios"},
+          {"atributo": "nivel_riesgo", "operador": "igual", "valor": "medio"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "ajustar_precio"}
+    }
+  ]
+}

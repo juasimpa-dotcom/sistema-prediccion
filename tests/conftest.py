@@ -25,3 +25,12 @@ def supervisado(crudo: pd.DataFrame) -> pd.DataFrame:
 def columnas() -> list[str]:
     """Columnas de características usadas por los modelos."""
     return [*CARACTERISTICAS_NUMERICAS, *CARACTERISTICAS_CATEGORICAS]
+
+
+@pytest.fixture(scope="session")
+def base_reglas():
+    """Base de conocimientos retail validada desde el JSON declarativo."""
+    from config import ARCHIVO_REGLAS_EXPERTO
+    from expert_system.base_conocimientos import BaseConocimientos
+
+    return BaseConocimientos.desde_json(ARCHIVO_REGLAS_EXPERTO)
