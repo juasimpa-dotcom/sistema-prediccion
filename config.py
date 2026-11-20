@@ -692,3 +692,40 @@ MAPEO_SALIDAS_DIFUSAS: Final[dict[str, str]] = {
 
 # Grado mínimo de pertenencia para convertir un valor numérico en hecho simbólico.
 UMBRAL_PERTENENCIA_DIFUSA: Final[float] = 0.10
+
+
+# ---------------------------------------------------------------------------
+# Búsqueda y planificación (Fase 5)
+# ---------------------------------------------------------------------------
+# Los efectos se inspiran en el generador de la Fase 1: la promoción aumenta
+# tráfico y conversión pero baja el precio; la merma reduce calidad y unidades
+# disponibles; el stock limita las ventas; el personal mejora la conversión.
+NIVELES_PROMOCION: Final[tuple[float, ...]] = (0.0, 10.0, 20.0)
+
+REPOSICION_UNIDADES: Final[int] = 400
+REASIGNACION_UNIDADES: Final[int] = 200
+STOCK_MAXIMO_UNIDADES: Final[int] = 1600
+INCREMENTO_PERSONAL: Final[int] = 1
+REDUCCION_MERMA_PP: Final[float] = 2.0
+
+# Costos semanales realistas en bolivianos. La promoción combina un coste fijo
+# de campaña con un coste proporcional al descuento (margin cedido).
+COSTO_REPOSICION_POR_UNIDAD_BS: Final[float] = 11.0
+COSTO_REASIGNACION_POR_UNIDAD_BS: Final[float] = 7.0
+COSTO_PERSONAL_ADICIONAL_BS: Final[float] = 300.0
+COSTO_REDUCCION_MERMA_POR_PP_BS: Final[float] = 110.0
+COSTO_PROMOCION_FIJO_BS: Final[float] = 250.0
+COSTO_PROMOCION_POR_PUNTO_BS: Final[float] = 10.0
+
+# Una persona adicional eleva la conversión un 35 % relativo a la dotación base.
+ELASTICIDAD_PERSONAL_VENTAS: Final[float] = 0.35
+LIMITE_PROFUNDIDAD_DFS: Final[int] = 12
+
+# Factores con los que un competidor responde a nuestra acción (minimax).
+# Sin cambio, promoción rival (roba menos clientela) y bajada de precio (peor).
+RESPUESTA_COMPETIDOR: Final[tuple[float, ...]] = (1.0, 0.94, 0.90)
+
+# Artefactos del benchmark de búsqueda.
+ARCHIVO_BENCHMARK_CSV: Final[Path] = DIR_DOCS / "benchmark_busqueda.csv"
+ARCHIVO_BENCHMARK_MD: Final[Path] = DIR_DOCS / "benchmark_busqueda.md"
+ARCHIVO_BENCHMARK_FIGURA: Final[Path] = DIR_DOCS / "figuras" / "benchmark_busqueda.png"

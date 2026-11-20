@@ -13,7 +13,7 @@ acciones y explica sus decisiones.
 | 2 | Preprocesamiento y modelo de Machine Learning | Completada |
 | 3 | Sistema experto (reglas y factores de certeza) | Completada |
 | 4 | Lógica difusa e integración con el sistema experto | Completada |
-| 5 | Búsqueda de planes de acción, API y dashboard | Pendiente |
+| 5 | Búsqueda y planificación de acciones comerciales | Completada |
 
 ## Estructura
 
@@ -27,14 +27,23 @@ sistema_prediccion/
   ml/                        # Preprocesamiento, entrenamiento, evaluación, SHAP
   models/                    # Modelos entrenados (joblib)
   expert_system/             # Memoria de trabajo, reglas, inferencia, difuso
-  search/                    # Espacio de estados, búsquedas no informadas e informadas
+  search/                    # Espacio de estados y planificación
+    espacio_estados.py       # Problema abstracto, EstadoPlan, operadores y heurística
+    resultado.py             # Resultado común a todos los algoritmos
+    no_informada.py          # BFS, DFS, backtracking y costo uniforme
+    informada.py             # Greedy, A* y heurística trivial de comparación
+    minimax.py               # Competidor que responde, Minimax y alfa-beta
+    benchmark.py             # Escenarios, tablas y gráfico comparativo
   api/                       # API FastAPI
   app/                       # Dashboard Streamlit
   notebooks/
     eda_ventas.py            # Análisis exploratorio y figuras
     figuras/                 # Gráficos generados
   tests/                     # Pruebas con pytest
-  docs/                      # CommonKADS e informe
+  docs/                      # CommonKADS, informe y artefactos del benchmark
+    benchmark_busqueda.csv   # Métricas por algoritmo y escenario
+    benchmark_busqueda.md    # Tablas y verificación de optimalidad
+    figuras/benchmark_busqueda.png
 ```
 
 ## Requisitos e instalación
@@ -200,8 +209,59 @@ Calidad y pruebas (incluye cobertura del sistema experto):
 ```powershell
 black --check .
 ruff check .
-pytest --cov=expert_system --cov-report=term-missing
+pytest --cov=expert_system --cov=search --cov-report=term-missing
 ```
+
+## Uso de la Fase 5
+
+`search/espacio_estados.py` define la interfaz genérica `Problema` (estado
+inicial, prueba de meta, acciones, sucesor y costo) y su instancia
+`ProblemaPlanComercial`. El estado `EstadoPlan` es una `dataclass` inmutable y
+hashable con stock, descuento, personal, merma, ventas proyectadas y
+presupuesto restante. Los operadores son promoción por niveles, reposición,
+reasignación entre sucursales, refuerzo de personal y reducción de merma; sus
+efectos y precios se leen de `config.py` y reproducen el modelo de la Fase 1:
+la promoción aumenta tráfico y conversión pero baja el precio, la merma reduce
+calidad y unidades disponibles, el stock limita las ventas y el personal mejora
+la conversión.
+
+```python
+from search.espacio_estados import ProblemaPlanComercial
+from search.informada import a_estrella
+
+problema = ProblemaPlanComercial(
+    meta_bs=24_000.0,
+    presupuesto_bs=9_000.0,
+    stock_inicial=400,
+    merma_inicial=12.0,
+)
+resultado = a_estrella(problema)
+print(resultado.descripcion_plan, resultado.costo, resultado.nodos_expandidos)
+```
+
+**Heurística y optimalidad.** Con `déficit = meta - ventas_proyectadas`, `G` la
+ganancia máxima de un paso, `c_min` el costo mínimo de un operador y `E` la
+máxima eficiencia (Bs de venta por Bs invertido), se usa
+`h = max(c_min · ceil(déficit / G), déficit / E)`. Hacen falta al menos
+`ceil(déficit / G)` acciones y al menos `déficit / E` bolivianos, así que `h` no
+sobreestima. Para cualquier sucesor con costo `c` y ganancia `g` se cumple
+`h1(s) - h1(s') <= c_min <= c` y `h2(s) - h2(s') = g / E <= c`; por tanto
+`h(s) <= c + h(s')`: es admisible y consistente, y A* con cierre de estados es
+óptimo sin reabrir nodos. `heuristica_cero` permite medir cuánto aporta.
+
+Todos los algoritmos devuelven el mismo `Resultado` (`plan`, `costo`,
+`nodos_expandidos`, `nodos_generados`, `profundidad`, `tiempo`, `encontrado`).
+`costo_uniforme` (Dijkstra) es la referencia óptima independiente usada para
+verificar A* en las pruebas. `search/minimax.py` modela la respuesta del
+competidor y comprueba que la poda alfa-beta conserva el valor de Minimax.
+
+```powershell
+python -m search.benchmark  # escenarios fácil, medio, difícil y sin solución
+```
+
+El benchmark guarda `docs/benchmark_busqueda.csv`,
+`docs/benchmark_busqueda.md` y `docs/figuras/benchmark_busqueda.png` con nodos
+expandidos, costo y tiempo por algoritmo.
 
 ## Dataset generado
 
