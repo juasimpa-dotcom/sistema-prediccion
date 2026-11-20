@@ -8,6 +8,7 @@ planifica con A* sobre el diagnóstico y compone la explicación final.
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 from config import (
     ATRIBUTO_CAUSA_VENTAS,
@@ -119,10 +120,10 @@ class SistemaInteligente:
             categoria=contexto.categoria,
             meta_bs=meta_bs,
             presupuesto_bs=contexto.presupuesto_bs,
-            stock_inicial=float(observado["stock_inicial"]),
-            merma_inicial=float(observado["merma_pct"]),
-            personal_inicial=float(observado["personal_asignado"]),
-            afluencia=float(observado["afluencia_clientes"]),
+            stock_inicial=float(cast(float, observado["stock_inicial"])),
+            merma_inicial=float(cast(float, observado["merma_pct"])),
+            personal_inicial=float(cast(float, observado["personal_asignado"])),
+            afluencia=float(cast(float, observado["afluencia_clientes"])),
             causas=diagnostico,
         )
         plan = self.planificador.planificar(solicitud)

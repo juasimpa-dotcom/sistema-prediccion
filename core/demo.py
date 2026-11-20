@@ -12,6 +12,8 @@ motor arranquen limpios; no hay estado global entre ejecuciones.
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 from core.fabrica import construir_contexto_desde_csv, construir_sistema
 
 CASOS: tuple[dict[str, object], ...] = (
@@ -56,7 +58,9 @@ def main() -> None:
     """Ejecuta e imprime los tres casos con su explicación completa."""
     for caso in CASOS:
         titulo = str(caso["titulo"])
-        datos = {clave: valor for clave, valor in caso.items() if clave != "titulo"}
+        datos = cast(
+            "dict[str, Any]", {clave: valor for clave, valor in caso.items() if clave != "titulo"}
+        )
         print(f"\n{'=' * 78}\n{titulo}\n{'=' * 78}")
 
         sistema = construir_sistema()

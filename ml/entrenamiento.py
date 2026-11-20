@@ -206,7 +206,8 @@ def evaluar_modelos(
         pipelines[nombre] = busqueda.best_estimator_
 
     metricas = {
-        nombre: calcular_metricas(y_prueba, valores) for nombre, valores in predicciones.items()
+        nombre: calcular_metricas(y_prueba.tolist(), valores.tolist())
+        for nombre, valores in predicciones.items()
     }
     return metricas, predicciones, pipelines
 
@@ -393,7 +394,9 @@ def main(argv: list[str] | None = None) -> None:
     mejor_pipeline = pipelines[mejor]
     mejor_prediccion = predicciones[mejor]
 
-    rutas = guardar_reporte(prueba["fecha_objetivo"], y_test, mejor_prediccion, tabla)
+    rutas = guardar_reporte(
+        prueba["fecha_objetivo"], y_test.tolist(), mejor_prediccion.tolist(), tabla
+    )
     LOGGER.info("Mejor modelo: %s", mejor)
 
     columnas_transformadas = obtener_nombres_caracteristicas(mejor_pipeline)

@@ -231,7 +231,7 @@ def crear_app(
         exc: StarletteHTTPException,
     ) -> JSONResponse:
         """Normaliza los errores HTTP a un cuerpo ``detalle`` en español."""
-        contenido = exc.detail
+        contenido: object = exc.detail
         if not isinstance(contenido, dict):
             contenido = {
                 "codigo": CODIGOS_HTTP.get(exc.status_code, "error_http"),

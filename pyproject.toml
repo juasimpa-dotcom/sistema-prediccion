@@ -23,3 +23,8 @@ convention = "google"
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["config.py", "core", "api", "ml", "expert_system", "search", "data", "app"]
+ignore_missing_imports = true

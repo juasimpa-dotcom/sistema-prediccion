@@ -390,6 +390,8 @@ class BaseConocimientos:
             condiciones = BaseConocimientos._parsear_condiciones(
                 datos["condiciones"], identificador
             )
+            if isinstance(condiciones, Condicion):
+                condiciones = GrupoCondiciones(operador="and", condiciones=(condiciones,))
             return Regla(
                 id=identificador,
                 descripcion=BaseConocimientos._texto_obligatorio(

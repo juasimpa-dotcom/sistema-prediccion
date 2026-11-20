@@ -35,7 +35,7 @@ import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Protocol, runtime_checkable
+from typing import Any, Final, Protocol, runtime_checkable
 
 import numpy as np
 import skfuzzy as fuzz
@@ -255,10 +255,10 @@ class SistemaDifuso:
             raise ValueError(
                 f"Faltan variables de salida: {sorted(salidas - self._variables.keys())}"
             )
-        for variable in self._mapeo.values():
-            if variable not in self._antecedentes:
+        for nombre_variable in self._mapeo.values():
+            if nombre_variable not in self._antecedentes:
                 raise ValueError(
-                    f"El mapeo apunta a una variable de entrada desconocida: {variable}"
+                    f"El mapeo apunta a una variable de entrada desconocida: {nombre_variable}"
                 )
 
         identificadores: set[str] = set()
@@ -271,28 +271,34 @@ class SistemaDifuso:
             identificadores.add(regla.id)
             if not regla.si or not regla.entonces:
                 raise ValueError(f"La regla {regla.id} necesita antecedentes y consecuentes")
-            antecedentes: list[object] = []
-            for variable, etiqueta in regla.si.items():
-                if variable not in self._antecedentes:
-                    raise ValueError(f"La regla {regla.id} usa una entrada desconocida: {variable}")
-                if etiqueta not in self._funciones[variable]:
+            antecedentes: list[Any] = []
+            for nombre_variable, etiqueta in regla.si.items():
+                if nombre_variable not in self._antecedentes:
                     raise ValueError(
-                        f"La regla {regla.id} usa una etiqueta desconocida: {variable}={etiqueta}"
+                        f"La regla {regla.id} usa una entrada desconocida: {nombre_variable}"
                     )
-                antecedentes.append(self._antecedentes[variable][etiqueta])
+                if etiqueta not in self._funciones[nombre_variable]:
+                    raise ValueError(
+                        f"La regla {regla.id} usa una etiqueta desconocida: "
+                        f"{nombre_variable}={etiqueta}"
+                    )
+                antecedentes.append(self._antecedentes[nombre_variable][etiqueta])
                 self._fuerzas[regla.id] = 0.0
             consecuentes: list[object] = []
-            for variable, etiqueta in regla.entonces.items():
-                if variable not in self._consecuentes:
-                    raise ValueError(f"La regla {regla.id} usa una salida desconocida: {variable}")
-                if etiqueta not in self._funciones[variable]:
+            for nombre_variable, etiqueta in regla.entonces.items():
+                if nombre_variable not in self._consecuentes:
                     raise ValueError(
-                        f"La regla {regla.id} usa una etiqueta desconocida: {variable}={etiqueta}"
+                        f"La regla {regla.id} usa una salida desconocida: {nombre_variable}"
                     )
-                consecuentes.append(self._consecuentes[variable][etiqueta])
+                if etiqueta not in self._funciones[nombre_variable]:
+                    raise ValueError(
+                        f"La regla {regla.id} usa una etiqueta desconocida: "
+                        f"{nombre_variable}={etiqueta}"
+                    )
+                consecuentes.append(self._consecuentes[nombre_variable][etiqueta])
             premisa = antecedentes[0]
             for termino in antecedentes[1:]:
-                premisa = premisa & termino  # type: ignore[attr-defined]
+                premisa = premisa & termino
             objetos_regla.append(ctrl.Rule(premisa, tuple(consecuentes)))
 
         self._sistema = ctrl.ControlSystem(objetos_regla)

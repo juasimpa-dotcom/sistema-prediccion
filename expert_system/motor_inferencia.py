@@ -31,9 +31,10 @@ descendente e ``id`` ascendente (desempate determinista). Eso equivale a
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Hashable
+from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import cast
 
 from config import UMBRAL_CF_EXPERTO
 from expert_system.base_conocimientos import BaseConocimientos, Condicion, GrupoCondiciones, Regla
@@ -500,7 +501,7 @@ class MotorInferencia:
         if condicion.operador == "en":
             mejores = [
                 self.verificar(condicion.atributo, opcion, memoria, traza, visitados)
-                for opcion in condicion.valor
+                for opcion in cast("Iterable[Hashable]", condicion.valor)
             ]
             ganador = max(mejores, key=lambda resultado: resultado.fc, default=None)
             if ganador is not None and supera_umbral(ganador.fc, self.umbral):

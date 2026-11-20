@@ -143,11 +143,11 @@ def busqueda_profundidad(
             mejor_profundidad[sucesor] = nueva_profundidad
             sucesores.append((sucesor, accion, problema.costo_paso(estado, accion)))
         # Se apilan en orden inverso para respetar el orden declarado de acciones.
-        for sucesor, accion, costo_paso in reversed(sucesores):
+        for sucesor, accion_paso, costo_paso in reversed(sucesores):
             frontera.append(
                 (
                     sucesor,
-                    (*plan, accion),
+                    (*plan, accion_paso),
                     round(costo + costo_paso, 2),
                     profundidad + 1,
                 )
@@ -184,6 +184,9 @@ def backtracking(
     inicio = time.perf_counter()
     expandidos = generados = maxima = 0
     profundidades: dict[EstadoT, int] = {}
+    mejor_plan: tuple[Hashable, ...] = ()
+    mejor_costo = 0.0
+    mejor_profundidad = maxima
 
     def visitar(
         estado: EstadoT, plan: tuple[Hashable, ...], costo: float, profundidad: int
@@ -213,9 +216,6 @@ def backtracking(
                 return True
         return False
 
-    mejor_plan: tuple[Hashable, ...] = ()
-    mejor_costo = 0.0
-    mejor_profundidad = maxima
     inicial = problema.estado_inicial()
     profundidades[inicial] = 0
     encontrado = visitar(inicial, (), 0.0, 0)

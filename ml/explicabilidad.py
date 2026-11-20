@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -154,7 +154,7 @@ def crear_explicador(
     return shap.KernelExplainer(modelo.predict, fondo), "KernelExplainer"
 
 
-def _valores_shap(explicador: object, matriz: np.ndarray) -> tuple[np.ndarray, float]:
+def _valores_shap(explicador: Any, matriz: np.ndarray) -> tuple[np.ndarray, float]:
     """Calcula valores SHAP y normaliza sus dimensiones para regresión.
 
     Args:
