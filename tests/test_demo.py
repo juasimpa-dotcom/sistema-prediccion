@@ -19,7 +19,11 @@ def test_demo_imprime_caso_y_explicaciones(capsys: pytest.CaptureFixture[str]) -
     """La demo imprime traza, conclusión, explicación y preguntas."""
     demo.main()
     salida = capsys.readouterr().out
-    assert "30 reglas" in salida
+    assert "38 reglas" in salida
+    assert "Mismo caso: sin difuso vs con difuso" in salida
+    assert "Defuzzificación" in salida
+    assert "Comentario:" in salida
+    assert "Hechos simbólicos con CF" in salida
     assert "Traza de inferencia" in salida
     assert "Hechos derivados" in salida
     assert "¿POR QUÉ?" in salida

@@ -11,9 +11,9 @@ acciones y explica sus decisiones.
 | ---- | ------- | ------ |
 | 1 | Configuración base y generación del dataset | Completada |
 | 2 | Preprocesamiento y modelo de Machine Learning | Completada |
-| 3 | Sistema experto (reglas, factores de certeza, lógica difusa) | En curso (reglas y motor completados) |
-| 4 | Búsqueda de planes de acción | Pendiente |
-| 5 | Explicabilidad, API y dashboard | Pendiente |
+| 3 | Sistema experto (reglas y factores de certeza) | Completada |
+| 4 | Lógica difusa e integración con el sistema experto | Completada |
+| 5 | Búsqueda de planes de acción, API y dashboard | Pendiente |
 
 ## Estructura
 
@@ -117,8 +117,9 @@ print(resultado.valor_predicho, resultado.confianza)
 ## Uso de la Fase 3
 
 El sistema experto es independiente del dominio: el motor solo conoce reglas y
-hechos. Las 30 reglas retail se declaran en `expert_system/reglas.json` y se
-validan al cargarse; también pueden construirse como lista de objetos `Regla`.
+hechos. Las 38 reglas retail (30 crisp + 8 consumidoras de hechos difusos) se
+declaran en `expert_system/reglas.json` y se validan al cargarse; también pueden
+construirse como lista de objetos `Regla`.
 
 Demostración completa (caso, traza y explicaciones):
 
@@ -146,6 +147,53 @@ El razonamiento inexacto usa factores de certeza MYCIN: `min` para
 conjunciones, `max` para disyunciones, producto para propagar una regla y las
 fórmulas de combinación para evidencia convergente. El encadenamiento hacia
 atrás puede pedir datos al proveedor y explicar cada pregunta.
+
+## Uso de la Fase 4
+
+`expert_system/logica_difusa.py` implementa un sistema Mamdani con scikit-fuzzy.
+Las cinco variables lingüísticas de entrada (`cumplimiento_esperado`,
+`nivel_stock`, `merma`, `afluencia`, `intensidad_promocion`), las dos salidas
+(`nivel_riesgo_incumplimiento`, `urgencia_accion`), sus funciones triangulares
+o trapezoidales, las 22 reglas difusas y el mapeo de hechos numéricos viven en
+`config.py`. La defuzzificación es por centroide.
+
+**Imprecisión vs. incertidumbre.** La lógica difusa modela conceptos borrosos
+(imprecisión): un cumplimiento del 82 % pertenece parcialmente a «bajo» y a
+«medio». El factor de certeza modela duda (incertidumbre): «creo con CF 0.8 que
+hay stock crítico». La interfaz `Fuzzificador` une ambos mundos: el motor
+convierte cada valor numérico en hechos simbólicos cuyo **CF es el grado de
+pertenencia**, y después aplica su aritmética MYCIN normal. El motor sigue sin
+conocer scikit-fuzzy ni el dominio: basta cualquier objeto que implemente
+`variables()`, `etiquetas()`, `pertenencia()`, `fuzzificar()` y `calcular()`.
+
+```python
+from expert_system.logica_difusa import SistemaDifuso
+from expert_system.motor_inferencia import MotorInferencia
+
+sistema = SistemaDifuso()
+resultado = sistema.calcular({
+    "cumplimiento_esperado_pct": 82.0,
+    "stock_cobertura": 0.12,
+    "merma_pct": 14.5,
+    "afluencia_rel": 0.72,
+    "descuento_pct": 0.0,
+})
+motor = MotorInferencia(base, memoria, fuzzificador=sistema)
+traza = motor.encadenar_adelante()
+print(resultado.descripcion(), motor.ultimo_resultado_difuso.hechos)
+```
+
+Comandos:
+
+```powershell
+python -m expert_system.logica_difusa   # cálculo, hechos simbólicos y gráficos
+python -m expert_system.demo            # mismo caso con y sin lógica difusa
+```
+
+Los gráficos de las siete funciones de pertenencia se guardan en
+`docs/figuras/pertenencia_<variable>.png`. La demo imprime el caso con y sin
+difuso y comenta la diferencia de justificación y, si aplica, el cambio de
+conclusión.
 
 Calidad y pruebas (incluye cobertura del sistema experto):
 

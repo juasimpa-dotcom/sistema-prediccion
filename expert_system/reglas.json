@@ -469,6 +469,120 @@
         ]
       },
       "conclusion": {"atributo": "accion_recomendada", "valor": "ajustar_precio"}
+    },
+    {
+      "id": "F01",
+      "descripcion": "Riesgo difuso crítico: escalar a riesgo alto para el motor crisp",
+      "categoria": "difuso",
+      "prioridad": 110,
+      "fc": 0.9,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "nivel_riesgo_difuso", "operador": "igual", "valor": "crítico"}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "F02",
+      "descripcion": "Riesgo difuso alto: confirmar riesgo alto con certeza moderada",
+      "categoria": "difuso",
+      "prioridad": 105,
+      "fc": 0.8,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "nivel_riesgo_difuso", "operador": "igual", "valor": "alto"}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "alto"}
+    },
+    {
+      "id": "F03",
+      "descripcion": "Riesgo difuso bajo: respaldar un riesgo bajo",
+      "categoria": "difuso",
+      "prioridad": 90,
+      "fc": 0.7,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "nivel_riesgo_difuso", "operador": "igual", "valor": "bajo"}
+        ]
+      },
+      "conclusion": {"atributo": "nivel_riesgo", "valor": "bajo"}
+    },
+    {
+      "id": "F04",
+      "descripcion": "Urgencia difusa alta: reponer stock de inmediato",
+      "categoria": "difuso",
+      "prioridad": 106,
+      "fc": 0.85,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "urgencia_accion", "operador": "igual", "valor": "alta"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reponer_stock_urgente"}
+    },
+    {
+      "id": "F05",
+      "descripcion": "Urgencia difusa media: activar una promoción correctiva",
+      "categoria": "difuso",
+      "prioridad": 95,
+      "fc": 0.7,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "urgencia_accion", "operador": "igual", "valor": "media"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "lanzar_promocion"}
+    },
+    {
+      "id": "F06",
+      "descripcion": "Urgencia difusa nula: mantener el plan de compras",
+      "categoria": "difuso",
+      "prioridad": 91,
+      "fc": 0.75,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "urgencia_accion", "operador": "igual", "valor": "ninguna"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "mantener_plan"}
+    },
+    {
+      "id": "F07",
+      "descripcion": "Merma fuzzificada alta con urgencia máxima: recortar pedido perecible",
+      "categoria": "difuso",
+      "prioridad": 102,
+      "fc": 0.88,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "merma", "operador": "igual", "valor": "alta"},
+          {"atributo": "urgencia_accion", "operador": "igual", "valor": "alta"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reducir_pedido_perecible"}
+    },
+    {
+      "id": "F08",
+      "descripcion": "Stock fuzzificado crítico con urgencia máxima: reasignar inventario",
+      "categoria": "difuso",
+      "prioridad": 99,
+      "fc": 0.82,
+      "condiciones": {
+        "operador": "and",
+        "condiciones": [
+          {"atributo": "nivel_stock", "operador": "igual", "valor": "crítico"},
+          {"atributo": "urgencia_accion", "operador": "igual", "valor": "alta"}
+        ]
+      },
+      "conclusion": {"atributo": "accion_recomendada", "valor": "reasignar_inventario"}
     }
   ]
 }

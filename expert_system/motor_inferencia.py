@@ -45,6 +45,7 @@ from expert_system.factores_certeza import (
     supera_umbral,
     validar_fc,
 )
+from expert_system.logica_difusa import Fuzzificador, HechoDifuso, ResultadoDifuso
 from expert_system.memoria_trabajo import Hecho, MemoriaTrabajo
 
 LOGGER = logging.getLogger(__name__)
@@ -197,6 +198,7 @@ class MotorInferencia:
         memoria: MemoriaTrabajo | None = None,
         umbral: float = UMBRAL_CF_EXPERTO,
         proveedor: Proveedor | None = None,
+        fuzzificador: Fuzzificador | None = None,
     ) -> None:
         """Inicializa el motor.
 
@@ -207,6 +209,8 @@ class MotorInferencia:
             proveedor: Función que responde datos desconocidos durante el
                 encadenamiento hacia atrás. Devuelve ``None`` si no sabe, un
                 valor concreto, o ``(valor, FC)`` para certezas parciales.
+            fuzzificador: Implementación opcional de :class:`Fuzzificador`. El
+                motor solo usa su interfaz: desconoce scikit-fuzzy y el dominio.
 
         Raises:
             TypeError: Si la base, la memoria o el proveedor tienen tipo inválido.
@@ -218,6 +222,8 @@ class MotorInferencia:
             raise TypeError("La memoria debe ser una MemoriaTrabajo")
         if proveedor is not None and not callable(proveedor):
             raise TypeError("El proveedor debe ser invocable")
+        if fuzzificador is not None and not isinstance(fuzzificador, Fuzzificador):
+            raise TypeError("El fuzzificador debe implementar el protocolo Fuzzificador")
         validar_fc(umbral, "umbral")
         if umbral < 0.0:
             raise ValueError("El umbral no puede ser negativo")
@@ -225,6 +231,103 @@ class MotorInferencia:
         self.memoria = memoria if memoria is not None else MemoriaTrabajo()
         self.umbral = umbral
         self.proveedor = proveedor
+        self.fuzzificador = fuzzificador
+        self.ultimo_resultado_difuso: ResultadoDifuso | None = None
+        self._difuso_aplicado = False
+        self._hechos_fuzzificados: set[tuple[str, Hashable]] = set()
+
+    def fuzzificar(self, memoria: MemoriaTrabajo | None = None) -> tuple[HechoDifuso, ...]:
+        """Convierte los hechos numéricos de la memoria en hechos simbólicos.
+
+        El factor de certeza de cada hecho simbólico es el grado de pertenencia
+        calculado por el fuzzificador. Los hechos ya registrados no se vuelven a
+        insertar para no inflar su certeza al combinar evidencia duplicada.
+
+        Args:
+            memoria: Memoria a usar; por defecto la del motor.
+
+        Returns:
+            Hechos simbólicos recién registrados. Sin fuzzificador, tupla vacía.
+        """
+        if self.fuzzificador is None:
+            return ()
+        destino = memoria if memoria is not None else self.memoria
+        if not isinstance(destino, MemoriaTrabajo):
+            raise TypeError("La memoria debe ser una MemoriaTrabajo")
+        generados = self.fuzzificador.fuzzificar(self._hechos_numericos(destino))
+        nuevos: list[HechoDifuso] = []
+        for hecho in generados:
+            clave = (hecho.atributo, hecho.valor)
+            if clave in self._hechos_fuzzificados:
+                continue
+            destino.registrar(
+                Hecho(
+                    atributo=hecho.atributo,
+                    valor=hecho.valor,
+                    fc=hecho.fc,
+                    origen=hecho.origen,
+                    detalle=(
+                        f"grado de pertenencia {hecho.fc:.3f} desde "
+                        f"{hecho.hecho_origen or hecho.variable}"
+                    ),
+                )
+            )
+            self._hechos_fuzzificados.add(clave)
+            nuevos.append(hecho)
+        return tuple(nuevos)
+
+    def aplicar_difuso(self, memoria: MemoriaTrabajo | None = None) -> ResultadoDifuso | None:
+        """Calcula las salidas difusas y las inyecta como hechos simbólicos.
+
+        El fuzzificador entrega los hechos de salida ya traducidos a atributos
+        de la memoria, con su factor de certeza y su trazabilidad. El motor los
+        registra sin conocer variables difusas, centroides ni nombres de dominio.
+        Solo se aplica una vez por memoria.
+
+        Args:
+            memoria: Memoria a usar; por defecto la del motor.
+
+        Returns:
+            Resultado difuso, o ``None`` si no hay fuzzificador o ya se aplicó.
+        """
+        destino = memoria if memoria is not None else self.memoria
+        if not isinstance(destino, MemoriaTrabajo):
+            raise TypeError("La memoria debe ser una MemoriaTrabajo")
+        if self.fuzzificador is None or self._difuso_aplicado:
+            return self.ultimo_resultado_difuso
+        resultado = self.fuzzificador.calcular(self._hechos_numericos(destino))
+        for salida in resultado.hechos_salida:
+            if destino.contiene(salida.atributo, salida.valor):
+                continue
+            destino.registrar(
+                Hecho(
+                    atributo=salida.atributo,
+                    valor=salida.valor,
+                    fc=salida.fc,
+                    origen=salida.origen,
+                    detalle=salida.detalle,
+                )
+            )
+        self.ultimo_resultado_difuso = resultado
+        self._difuso_aplicado = True
+        LOGGER.info("Salida difusa inyectada en la memoria: %s", resultado.descripcion())
+        return resultado
+
+    def _preparar_difuso(self, memoria: MemoriaTrabajo) -> None:
+        """Fuzzifica entradas y aplica salidas difusas una sola vez."""
+        if self.fuzzificador is None or self._difuso_aplicado:
+            return
+        self.fuzzificar(memoria)
+        self.aplicar_difuso(memoria)
+
+    @staticmethod
+    def _hechos_numericos(memoria: MemoriaTrabajo) -> dict[str, float]:
+        """Extrae los hechos numéricos vigentes de la memoria de trabajo."""
+        valores: dict[str, float] = {}
+        for hecho in memoria.historial():
+            if isinstance(hecho.valor, (int, float)) and not isinstance(hecho.valor, bool):
+                valores[hecho.atributo] = float(hecho.valor)
+        return valores
 
     def encadenar_adelante(self, memoria: MemoriaTrabajo | None = None) -> TrazaInferencia:
         """Deriva todas las conclusiones alcanzables a partir de los hechos conocidos.
@@ -238,6 +341,7 @@ class MotorInferencia:
         destino = memoria if memoria is not None else self.memoria
         if not isinstance(destino, MemoriaTrabajo):
             raise TypeError("La memoria debe ser una MemoriaTrabajo")
+        self._preparar_difuso(destino)
         traza = TrazaInferencia(modo="adelante", objetivo="todas las conclusiones")
         while True:
             disparables: list[tuple[Regla, float]] = []
@@ -286,6 +390,7 @@ class MotorInferencia:
         if not isinstance(destino, MemoriaTrabajo):
             raise TypeError("La memoria debe ser una MemoriaTrabajo")
         if traza is None:
+            self._preparar_difuso(destino)
             traza = TrazaInferencia(modo="atras", objetivo=f"{objetivo}={_texto(valor)}")
         if visitados is None:
             visitados = set()

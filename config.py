@@ -23,6 +23,7 @@ DIR_MODELOS: Final[Path] = RAIZ_PROYECTO / "models"
 DIR_DOCS: Final[Path] = RAIZ_PROYECTO / "docs"
 DIR_NOTEBOOKS: Final[Path] = RAIZ_PROYECTO / "notebooks"
 DIR_FIGURAS: Final[Path] = DIR_NOTEBOOKS / "figuras"
+DIR_FIGURAS_DIFUSAS: Final[Path] = DIR_DOCS / "figuras"
 
 ARCHIVO_VENTAS_CRUDO: Final[Path] = DIR_DATOS_CRUDOS / "ventas_semanales.csv"
 
@@ -419,3 +420,275 @@ VERSION_BASE_CONOCIMIENTOS: Final[str] = "3.0.0"
 
 # Una regla solo se dispara cuando la certeza de su premisa alcanza este valor.
 UMBRAL_CF_EXPERTO: Final[float] = 0.20
+
+
+# ---------------------------------------------------------------------------
+# Lógica difusa (Fase 4)
+# ---------------------------------------------------------------------------
+# Universo = (mínimo, máximo, paso). Las regiones se declaran con tres puntos
+# para triángulos y cuatro para trapecios, en orden creciente.
+@dataclass(frozen=True, slots=True)
+class RegionDifusa:
+    """Región de pertenencia declarativa de una variable lingüística.
+
+    Attributes:
+        tipo: ``triangular`` o ``trapezoidal``.
+        puntos: Tres puntos (triángulo) o cuatro (trapecio) en orden creciente.
+    """
+
+    tipo: str
+    puntos: tuple[float, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class VariableDifusa:
+    """Variable lingüística con universo numérico y etiquetas graduales.
+
+    Attributes:
+        universo: Triple ``(mínimo, máximo, paso)``.
+        etiquetas: Nombre de cada etiqueta y su región de pertenencia.
+    """
+
+    universo: tuple[float, float, float]
+    etiquetas: dict[str, RegionDifusa]
+
+
+@dataclass(frozen=True, slots=True)
+class ReglaDifusa:
+    """Regla difusa declarativa ``SI ... ENTONCES ...``.
+
+    Attributes:
+        id: Identificador único.
+        descripcion: Intuición de negocio de la regla.
+        si: Mapping de variable lingüística a etiqueta antecedente.
+        entonces: Mapping de variable lingüística a etiqueta consecuente.
+    """
+
+    id: str
+    descripcion: str
+    si: dict[str, str]
+    entonces: dict[str, str]
+
+
+VARIABLES_DIFUSAS: Final[dict[str, VariableDifusa]] = {
+    "cumplimiento_esperado": VariableDifusa(
+        (0.0, 130.0, 1.0),
+        {
+            "bajo": RegionDifusa("trapezoidal", (0.0, 0.0, 70.0, 90.0)),
+            "medio": RegionDifusa("triangular", (80.0, 95.0, 110.0)),
+            "alto": RegionDifusa("trapezoidal", (100.0, 115.0, 130.0, 130.0)),
+        },
+    ),
+    "nivel_stock": VariableDifusa(
+        (0.0, 2.0, 0.01),
+        {
+            "crítico": RegionDifusa("trapezoidal", (0.0, 0.0, 0.25, 0.5)),
+            "adecuado": RegionDifusa("triangular", (0.35, 0.7, 1.05)),
+            "excesivo": RegionDifusa("trapezoidal", (0.9, 1.25, 2.0, 2.0)),
+        },
+    ),
+    "merma": VariableDifusa(
+        (0.0, 30.0, 0.5),
+        {
+            "baja": RegionDifusa("trapezoidal", (0.0, 0.0, 4.0, 8.0)),
+            "media": RegionDifusa("triangular", (6.0, 11.0, 16.0)),
+            "alta": RegionDifusa("trapezoidal", (14.0, 20.0, 30.0, 30.0)),
+        },
+    ),
+    "afluencia": VariableDifusa(
+        (0.0, 1.5, 0.01),
+        {
+            "baja": RegionDifusa("trapezoidal", (0.0, 0.0, 0.7, 0.9)),
+            "normal": RegionDifusa("triangular", (0.8, 1.0, 1.2)),
+            "alta": RegionDifusa("trapezoidal", (1.1, 1.3, 1.5, 1.5)),
+        },
+    ),
+    "intensidad_promocion": VariableDifusa(
+        (0.0, 30.0, 0.5),
+        {
+            "ninguna": RegionDifusa("trapezoidal", (0.0, 0.0, 0.0, 5.0)),
+            "moderada": RegionDifusa("triangular", (3.0, 10.0, 17.0)),
+            "fuerte": RegionDifusa("trapezoidal", (15.0, 22.0, 30.0, 30.0)),
+        },
+    ),
+    "nivel_riesgo_incumplimiento": VariableDifusa(
+        (0.0, 100.0, 1.0),
+        {
+            "bajo": RegionDifusa("trapezoidal", (0.0, 0.0, 20.0, 40.0)),
+            "medio": RegionDifusa("triangular", (30.0, 50.0, 70.0)),
+            "alto": RegionDifusa("triangular", (60.0, 75.0, 90.0)),
+            "crítico": RegionDifusa("trapezoidal", (85.0, 95.0, 100.0, 100.0)),
+        },
+    ),
+    "urgencia_accion": VariableDifusa(
+        (0.0, 100.0, 1.0),
+        {
+            "ninguna": RegionDifusa("trapezoidal", (0.0, 0.0, 10.0, 25.0)),
+            "baja": RegionDifusa("triangular", (20.0, 35.0, 50.0)),
+            "media": RegionDifusa("triangular", (45.0, 60.0, 75.0)),
+            "alta": RegionDifusa("trapezoidal", (70.0, 85.0, 100.0, 100.0)),
+        },
+    ),
+}
+
+SALIDAS_DIFUSAS: Final[tuple[str, ...]] = (
+    "nivel_riesgo_incumplimiento",
+    "urgencia_accion",
+)
+
+# Defuzzificación por centroide de un sistema Mamdani con conectivos min/max.
+REGLAS_DIFUSAS: Final[tuple[ReglaDifusa, ...]] = (
+    ReglaDifusa(
+        "DF01",
+        "Cumplimiento bajo con stock crítico: riesgo crítico y acción inmediata",
+        {"cumplimiento_esperado": "bajo", "nivel_stock": "crítico"},
+        {"nivel_riesgo_incumplimiento": "crítico", "urgencia_accion": "alta"},
+    ),
+    ReglaDifusa(
+        "DF02",
+        "Cumplimiento bajo con merma alta agrava el riesgo",
+        {"cumplimiento_esperado": "bajo", "merma": "alta"},
+        {"nivel_riesgo_incumplimiento": "crítico", "urgencia_accion": "alta"},
+    ),
+    ReglaDifusa(
+        "DF03",
+        "Cumplimiento bajo y poca afluencia: riesgo alto",
+        {"cumplimiento_esperado": "bajo", "afluencia": "baja"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "alta"},
+    ),
+    ReglaDifusa(
+        "DF04",
+        "Cumplimiento bajo sin promoción: riesgo alto",
+        {"cumplimiento_esperado": "bajo", "intensidad_promocion": "ninguna"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF05",
+        "Cumplimiento bajo con stock adecuado: riesgo alto",
+        {"cumplimiento_esperado": "bajo", "nivel_stock": "adecuado"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF06",
+        "Cumplimiento medio con stock crítico: riesgo alto",
+        {"cumplimiento_esperado": "medio", "nivel_stock": "crítico"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "alta"},
+    ),
+    ReglaDifusa(
+        "DF07",
+        "Cumplimiento medio con merma alta: riesgo alto",
+        {"cumplimiento_esperado": "medio", "merma": "alta"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF08",
+        "Cumplimiento medio con afluencia baja: riesgo alto",
+        {"cumplimiento_esperado": "medio", "afluencia": "baja"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF09",
+        "Cumplimiento medio sin promoción: riesgo medio",
+        {"cumplimiento_esperado": "medio", "intensidad_promocion": "ninguna"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF10",
+        "Cumplimiento medio con excedente de stock: riesgo medio",
+        {"cumplimiento_esperado": "medio", "nivel_stock": "excesivo"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "baja"},
+    ),
+    ReglaDifusa(
+        "DF11",
+        "Cumplimiento alto pero stock crítico: riesgo medio",
+        {"cumplimiento_esperado": "alto", "nivel_stock": "crítico"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF12",
+        "Cumplimiento alto con merma alta: riesgo medio",
+        {"cumplimiento_esperado": "alto", "merma": "alta"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "baja"},
+    ),
+    ReglaDifusa(
+        "DF13",
+        "Cumplimiento alto y afluencia alta: riesgo bajo",
+        {"cumplimiento_esperado": "alto", "afluencia": "alta"},
+        {"nivel_riesgo_incumplimiento": "bajo", "urgencia_accion": "baja"},
+    ),
+    ReglaDifusa(
+        "DF14",
+        "Cumplimiento alto con promoción fuerte: riesgo bajo",
+        {"cumplimiento_esperado": "alto", "intensidad_promocion": "fuerte"},
+        {"nivel_riesgo_incumplimiento": "bajo", "urgencia_accion": "ninguna"},
+    ),
+    ReglaDifusa(
+        "DF15",
+        "Cumplimiento alto con stock adecuado: riesgo bajo",
+        {"cumplimiento_esperado": "alto", "nivel_stock": "adecuado"},
+        {"nivel_riesgo_incumplimiento": "bajo", "urgencia_accion": "ninguna"},
+    ),
+    ReglaDifusa(
+        "DF16",
+        "Stock crítico y merma alta: riesgo crítico",
+        {"nivel_stock": "crítico", "merma": "alta"},
+        {"nivel_riesgo_incumplimiento": "crítico", "urgencia_accion": "alta"},
+    ),
+    ReglaDifusa(
+        "DF17",
+        "Afluencia baja sin promoción: riesgo alto",
+        {"afluencia": "baja", "intensidad_promocion": "ninguna"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF18",
+        "Escenario ideal: riesgo bajo y sin urgencia",
+        {"nivel_stock": "excesivo", "merma": "baja", "cumplimiento_esperado": "alto"},
+        {"nivel_riesgo_incumplimiento": "bajo", "urgencia_accion": "ninguna"},
+    ),
+    ReglaDifusa(
+        "DF19",
+        "Cumplimiento bajo con promoción fuerte: riesgo alto atenuado",
+        {"cumplimiento_esperado": "bajo", "intensidad_promocion": "fuerte"},
+        {"nivel_riesgo_incumplimiento": "alto", "urgencia_accion": "media"},
+    ),
+    ReglaDifusa(
+        "DF20",
+        "Afluencia alta con merma media: riesgo medio",
+        {"afluencia": "alta", "merma": "media"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "baja"},
+    ),
+    ReglaDifusa(
+        "DF21",
+        "Cumplimiento medio con operación estable: riesgo medio",
+        {"cumplimiento_esperado": "medio", "afluencia": "normal", "nivel_stock": "adecuado"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "baja"},
+    ),
+    ReglaDifusa(
+        "DF22",
+        "Cumplimiento bajo con sobrestock: riesgo medio",
+        {"cumplimiento_esperado": "bajo", "nivel_stock": "excesivo"},
+        {"nivel_riesgo_incumplimiento": "medio", "urgencia_accion": "media"},
+    ),
+)
+
+# Un hecho numérico se convierte enhechos simbólicos de su variable lingüística.
+MAPEO_DIFUSO_HECHOS: Final[dict[str, str]] = {
+    "cumplimiento_esperado_pct": "cumplimiento_esperado",
+    "stock_cobertura": "nivel_stock",
+    "merma_pct": "merma",
+    "afluencia_rel": "afluencia",
+    "descuento_pct": "intensidad_promocion",
+}
+ATRIBUTO_RIESGO_DIFUSO: Final[str] = "nivel_riesgo_difuso"
+ATRIBUTO_URGENCIA: Final[str] = "urgencia_accion"
+
+# Variables lingüísticas de salida -> atributo de la memoria del sistema experto.
+# El riesgo se registra aparte del riesgo crisp para no mezclar ambas evidencias.
+MAPEO_SALIDAS_DIFUSAS: Final[dict[str, str]] = {
+    "nivel_riesgo_incumplimiento": ATRIBUTO_RIESGO_DIFUSO,
+    "urgencia_accion": ATRIBUTO_URGENCIA,
+}
+
+# Grado mínimo de pertenencia para convertir un valor numérico en hecho simbólico.
+UMBRAL_PERTENENCIA_DIFUSA: Final[float] = 0.10
