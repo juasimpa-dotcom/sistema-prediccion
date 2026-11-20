@@ -26,6 +26,14 @@ DIR_FIGURAS: Final[Path] = DIR_NOTEBOOKS / "figuras"
 
 ARCHIVO_VENTAS_CRUDO: Final[Path] = DIR_DATOS_CRUDOS / "ventas_semanales.csv"
 
+# Artefactos de la Fase 2.
+ARCHIVO_MODELO: Final[Path] = DIR_MODELOS / "predictor_ventas.joblib"
+ARCHIVO_COMPARACION: Final[Path] = DIR_DOCS / "comparacion_modelos.csv"
+ARCHIVO_COMPARACION_MD: Final[Path] = DIR_DOCS / "comparacion_modelos.md"
+ARCHIVO_METRICAS: Final[Path] = DIR_DOCS / "metricas_modelo.json"
+ARCHIVO_IMPORTANCIAS: Final[Path] = DIR_DOCS / "importancia_variables.csv"
+DIR_FIGURAS_MODELOS: Final[Path] = DIR_DOCS / "figuras"
+
 # ---------------------------------------------------------------------------
 # Reproducibilidad
 # ---------------------------------------------------------------------------
@@ -335,3 +343,69 @@ class ParametrosGeneracion:
 
 
 PARAMETROS_GENERACION: Final[ParametrosGeneracion] = ParametrosGeneracion()
+
+
+# ---------------------------------------------------------------------------
+# Parámetros de Machine Learning (Fase 2)
+# ---------------------------------------------------------------------------
+VERSION_MODELO: Final[str] = "2.0.0"
+
+# El objetivo es la venta de la semana siguiente. Para predecirla se usa toda
+# la información de la semana t (cerrada) y el calendario conocido de t+1.
+LAGS_VENTAS: Final[tuple[int, ...]] = (1, 2, 4)
+VENTANAS_MEDIA_MOVIL: Final[tuple[int, ...]] = (2, 4, 8)
+HISTORIA_MINIMA_SEMANAS: Final[int] = max(LAGS_VENTAS + VENTANAS_MEDIA_MOVIL)
+
+# Primeros 18 meses para entrenar; último medio año para probar.
+FECHA_CORTE_ENTRENAMIENTO: Final[date] = date(2025, 6, 30)
+DIVISIONES_TIEMPO: Final[int] = 5
+
+# Características numéricas: lags y medias móviles de ventas, covariates de la
+# semana cerrada y calendario de la semana objetivo.
+CARACTERISTICAS_NUMERICAS: Final[tuple[str, ...]] = (
+    "ventas_lag_1",
+    "ventas_lag_2",
+    "ventas_lag_4",
+    "ventas_media_2",
+    "ventas_media_4",
+    "ventas_media_8",
+    "unidades_vendidas",
+    "precio_promedio",
+    "en_promocion",
+    "descuento_pct",
+    "stock_inicial",
+    "merma_pct",
+    "temperatura_media",
+    "afluencia_clientes",
+    "personal_asignado",
+    "meta_ventas_bs",
+    "semana_anio",
+    "mes",
+    "es_feriado_objetivo",
+)
+
+# Características categóricas codificadas con One-Hot.
+CARACTERISTICAS_CATEGORICAS: Final[tuple[str, ...]] = (
+    "sucursal",
+    "categoria",
+    "temporada_objetivo",
+)
+
+CLAVE_SERIE: Final[tuple[str, str]] = ("sucursal", "categoria")
+COLUMNAS_IDENTIFICADOR: Final[tuple[str, ...]] = (
+    "fecha_origen",
+    "fecha_objetivo",
+    "sucursal",
+    "categoria",
+)
+COLUMNA_OBJETIVO: Final[str] = "ventas_objetivo"
+COLUMNA_META_OBJETIVO: Final[str] = "meta_objetivo"
+
+# Parámetros de explicabilidad y confianza.
+NUMERO_FACTORES_LOCALES: Final[int] = 5
+MAX_MUESTRAS_SHAP: Final[int] = 200
+CONFIANZA_MINIMA: Final[float] = 0.05
+CONFIANZA_MAXIMA: Final[float] = 0.98
+
+# Tolerancia para evitar divisiones por cero en métricas y confianza.
+EPSILON: Final[float] = 1e-9

@@ -1,0 +1,125 @@
+{
+  "version": "2.0.0",
+  "fecha": "2026-11-19T20:05:16",
+  "semilla": 2026,
+  "nombre_modelo": "Ridge",
+  "mejores_parametros": {
+    "modelo__alpha": "100.0"
+  },
+  "metricas": {
+    "mae": 2298.4809,
+    "rmse": 3488.8756,
+    "r2": 0.762685,
+    "mape": 15.1403
+  },
+  "metricas_por_modelo": {
+    "Baseline (semana anterior)": {
+      "mae": 3013.047,
+      "rmse": 4496.601,
+      "r2": 0.605795,
+      "mape": 19.7131
+    },
+    "Ridge": {
+      "mae": 2298.4809,
+      "rmse": 3488.8756,
+      "r2": 0.762685,
+      "mape": 15.1403
+    },
+    "Random Forest": {
+      "mae": 2465.7278,
+      "rmse": 3587.8354,
+      "r2": 0.749032,
+      "mape": 16.29
+    },
+    "Gradient Boosting": {
+      "mae": 2417.2499,
+      "rmse": 3660.9746,
+      "r2": 0.738695,
+      "mape": 15.7899
+    },
+    "MLPRegressor": {
+      "mae": 2485.6472,
+      "rmse": 3650.8587,
+      "r2": 0.740137,
+      "mape": 16.3465
+    }
+  },
+  "columnas": {
+    "numericas": [
+      "ventas_lag_1",
+      "ventas_lag_2",
+      "ventas_lag_4",
+      "ventas_media_2",
+      "ventas_media_4",
+      "ventas_media_8",
+      "unidades_vendidas",
+      "precio_promedio",
+      "en_promocion",
+      "descuento_pct",
+      "stock_inicial",
+      "merma_pct",
+      "temperatura_media",
+      "afluencia_clientes",
+      "personal_asignado",
+      "meta_ventas_bs",
+      "semana_anio",
+      "mes",
+      "es_feriado_objetivo"
+    ],
+    "categoricas": [
+      "sucursal",
+      "categoria",
+      "temporada_objetivo"
+    ],
+    "transformadas": [
+      "num__ventas_lag_1",
+      "num__ventas_lag_2",
+      "num__ventas_lag_4",
+      "num__ventas_media_2",
+      "num__ventas_media_4",
+      "num__ventas_media_8",
+      "num__unidades_vendidas",
+      "num__precio_promedio",
+      "num__en_promocion",
+      "num__descuento_pct",
+      "num__stock_inicial",
+      "num__merma_pct",
+      "num__temperatura_media",
+      "num__afluencia_clientes",
+      "num__personal_asignado",
+      "num__meta_ventas_bs",
+      "num__semana_anio",
+      "num__mes",
+      "num__es_feriado_objetivo",
+      "cat__sucursal_Calacoto",
+      "cat__sucursal_El Alto",
+      "cat__sucursal_Miraflores",
+      "cat__sucursal_Obrajes",
+      "cat__sucursal_San Pedro",
+      "cat__sucursal_Sopocachi",
+      "cat__categoria_cerdo",
+      "cat__categoria_congelados",
+      "cat__categoria_embutidos",
+      "cat__categoria_pollo",
+      "cat__temporada_objetivo_alta",
+      "cat__temporada_objetivo_baja",
+      "cat__temporada_objetivo_media"
+    ],
+    "objetivo": "ventas_objetivo"
+  },
+  "calibracion": {
+    "desvio_residuos_relativos": 0.2338479468542933,
+    "mape_prueba": 15.140260351603189,
+    "confianza_ejemplo": 0.46050771455897205,
+    "meta_promedio": 14936.820433333336
+  },
+  "fecha_corte_entrenamiento": "2025-06-30",
+  "reporte": {
+    "tabla_csv": "C:\\Proyectos\\sistema_prediccion\\docs\\comparacion_modelos.csv",
+    "tabla_markdown": "C:\\Proyectos\\sistema_prediccion\\docs\\comparacion_modelos.md",
+    "real_vs_predicho": "C:\\Proyectos\\sistema_prediccion\\docs\\figuras\\real_vs_predicho.png",
+    "residuos": "C:\\Proyectos\\sistema_prediccion\\docs\\figuras\\residuos.png",
+    "generado": "2026-11-19T20:05:16"
+  },
+  "importancias": "C:\\Proyectos\\sistema_prediccion\\docs\\importancia_variables.csv"
+}

@@ -10,7 +10,7 @@ acciones y explica sus decisiones.
 | Fase | Alcance | Estado |
 | ---- | ------- | ------ |
 | 1 | Configuración base y generación del dataset | Completada |
-| 2 | Preprocesamiento y modelo de Machine Learning | Pendiente |
+| 2 | Preprocesamiento y modelo de Machine Learning | Completada |
 | 3 | Sistema experto (reglas, factores de certeza, lógica difusa) | Pendiente |
 | 4 | Búsqueda de planes de acción | Pendiente |
 | 5 | Explicabilidad, API y dashboard | Pendiente |
@@ -67,6 +67,51 @@ Ejecutar el análisis exploratorio (requiere el dataset generado):
 
 ```powershell
 python -m notebooks.eda_ventas
+```
+
+## Uso de la Fase 2
+
+Entrenar, evaluar y guardar el modelo (comando único y reproducible):
+
+```powershell
+python -m ml.entrenamiento
+```
+
+Opciones disponibles:
+
+```powershell
+python -m ml.entrenamiento --semilla 2026 --sin-mlp
+```
+
+La convención es que la fila `t` predice las ventas de `t+1`: los lags y las
+medias móviles se calculan solo con semanas cerradas, y el calendario (mes,
+temporada y feriado) corresponde a la semana objetivo. El corte temporal deja
+el entrenamiento hasta el 30 de junio de 2025 y la prueba después. La búsqueda
+de hiperparámetros usa `TimeSeriesSplit` y la selección final se hace por MAE
+en el conjunto de prueba.
+
+Resultados obtenidos con la semilla 2026:
+
+| Modelo | MAE | RMSE | R2 | MAPE |
+| ------ | --- | ---- | -- | ---- |
+| Ridge (seleccionado) | 2 298,48 | 3 488,88 | 0,7627 | 15,14 % |
+| Gradient Boosting | 2 417,25 | 3 660,97 | 0,7387 | 15,79 % |
+| Random Forest | 2 465,73 | 3 587,84 | 0,7490 | 16,29 % |
+| MLPRegressor | 2 485,65 | 3 650,86 | 0,7401 | 16,35 % |
+| Baseline (semana anterior) | 3 013,05 | 4 496,60 | 0,6058 | 19,71 % |
+
+El modelo seleccionado mejora al baseline en un 23,72 % de MAE. La tabla
+comparativa y las figuras quedan en `docs/`; el artefacto `models/predictor_ventas.joblib`
+incluye el pipeline, los metadatos y el fondo de referencia para SHAP.
+
+Predicción individual mediante la fachada:
+
+```python
+from ml.predictor import PredictorVentas
+
+predictor = PredictorVentas()
+resultado = predictor.predecir({"historial": historial_de_la_serie})
+print(resultado.valor_predicho, resultado.confianza)
 ```
 
 Calidad y pruebas:
