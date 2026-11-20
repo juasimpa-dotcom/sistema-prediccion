@@ -15,6 +15,7 @@ acciones y explica sus decisiones.
 | 4 | Lógica difusa e integración con el sistema experto | Completada |
 | 5 | Búsqueda y planificación de acciones comerciales | Completada |
 | 6 | Orquestador que integra todos los componentes | Completada |
+| 7 | API REST con FastAPI y dashboard con Streamlit | Completada |
 
 ## Estructura
 
@@ -44,8 +45,13 @@ sistema_prediccion/
     sistema.py               # SistemaInteligente.ejecutar(contexto)
     fabrica.py               # Composition root: instancia e inyecta dependencias
     demo.py                  # Tres casos: riesgo, normal y exceso de stock
-  api/                       # API FastAPI
-  app/                       # Dashboard Streamlit
+  api/                       # API FastAPI (Fase 7)
+    main.py                  # crear_app(), endpoints, CORS, logging y errores
+    esquemas.py              # Modelos Pydantic estrictos de entrada y salida
+    dependencias.py          # Servicio, repositorio y Depends desde app.state
+    mapeado.py               # Proyección del resultado del núcleo a la API
+  app/                       # Dashboard Streamlit (Fase 7)
+    dashboard.py             # Interfaz en español que consume la API
   notebooks/
     eda_ventas.py            # Análisis exploratorio y figuras
     figuras/                 # Gráficos generados
@@ -328,6 +334,72 @@ a extremo sobre `data/raw/ventas_semanales.csv` y
 `models/predictor_ventas.joblib`:
 
 ```powershell
+pytest
+```
+
+## Uso de la Fase 7
+
+La API expone la fachada de la Fase 6 como servicio HTTP y el dashboard es un
+cliente ligero: **toda la lógica sigue en el núcleo**. Cada petición construye
+ un `SistemaInteligente` nuevo porque la memoria de trabajo acumula estado.
+
+### Levantar la API
+
+En una terminal, desde la raíz del proyecto:
+
+```powershell
+.\venv\Scripts\python.exe -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Documentación interactiva (OpenAPI, en español): <http://localhost:8000/docs>.
+También está disponible ReDoc en <http://localhost:8000/redoc>.
+
+| Método | Endpoint | Descripción |
+| ------ | -------- | ----------- |
+| `POST` | `/predecir` | Predicción, confianza, factores SHAP, histórico y proyección. |
+| `POST` | `/diagnosticar` | Causas con factor de certeza, riesgo difuso y semáforo. |
+| `POST` | `/planificar` | Plan de A* con costo, restricciones y justificación. |
+| `POST` | `/analisis-completo` | Respuesta integral consumida por el dashboard. |
+| `GET` | `/explicar/{id}` | Explicación de un análisis guardado, recuperada por UUID. |
+| `GET` | `/salud` | Estado del servicio y de los artefactos requeridos. |
+| `GET` | `/catalogos` | Sucursales, categorías y temporadas del dominio. |
+| `GET` | `/benchmark` | Métricas del benchmark de búsqueda de la Fase 5. |
+
+Ejemplo mínimo:
+
+```powershell
+curl -X POST http://localhost:8000/analisis-completo ^
+  -H "Content-Type: application/json" ^
+  -d "{\"sucursal\":\"El Alto\",\"categoria\":\"pollo\",\"factor_meta\":1.2}"
+```
+
+Los orígenes CORS permitidos por defecto son `http://localhost:8501` y
+`http://127.0.0.1:8501`. Se pueden reemplazar con una lista separada por comas:
+
+```powershell
+$env:API_CORS_ORIGINS = "http://localhost:8501,http://localhost:3000"
+```
+
+### Levantar el dashboard
+
+En otra terminal, con la API ya iniciada:
+
+```powershell
+.\venv\Scripts\python.exe -m streamlit run app/dashboard.py --server.port 8501
+```
+
+Abrir <http://localhost:8501>. La interfaz permite elegir sucursal y categoría,
+ajustar el escenario y muestra histórico versus proyección, semáforo de riesgo,
+causas con barras de certeza, plan de acciones, explicación con gráfico SHAP y
+las pestañas de comparación de algoritmos, traza de reglas e IA simbólica frente
+a no simbólica. La URL de la API se puede cambiar en la barra lateral; por
+defecto se usa `http://localhost:8000`.
+
+### Pruebas y calidad de la Fase 7
+
+```powershell
+black --check .
+ruff check .
 pytest
 ```
 

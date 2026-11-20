@@ -761,3 +761,35 @@ RESTRICCIONES_CAUSA_OPERADOR: Final[dict[str, dict[str, bool]]] = {
     "exceso_stock": {"permitir_reasignacion": False, "permitir_reducir_merma": True},
     "operacion_critica": {"permitir_reasignacion": True, "permitir_reducir_merma": False},
 }
+
+
+# ---------------------------------------------------------------------------
+# API REST y dashboard (Fase 7)
+# ---------------------------------------------------------------------------
+API_TITULO: Final[str] = "Sistema inteligente de predicción de ventas"
+API_VERSION: Final[str] = "7.0.0"
+API_DESCRIPCION: Final[str] = (
+    "Servicio REST del sistema híbrido neuro-simbólico: predicción con SHAP, "
+    "diagnóstico con factores de certeza, riesgo difuso, plan con A* y "
+    "explicaciones en español. Todos los endpoint consumen la misma fachada "
+    "``SistemaInteligente.ejecutar``; la API solo proyecta subconjuntos de su "
+    "resultado."
+)
+API_CORS_ORIGENES: Final[tuple[str, ...]] = (
+    "http://localhost:8501",
+    "http://127.0.0.1:8501",
+)
+API_CORS_ORIGENES_ENV: Final[str] = "API_CORS_ORIGINS"
+
+DASHBOARD_API_URL: Final[str] = "http://localhost:8000"
+DASHBOARD_TIMEOUT_S: Final[float] = 30.0
+
+# Colores del semáforo de riesgo usados por el dashboard. La etiqueta difusa
+# permanece en español; el color es solo una proyección visual del resultado.
+RIESGO_SEMAFORO: Final[dict[str, str]] = {
+    "bajo": "verde",
+    "medio": "amarillo",
+    "alto": "naranja",
+    "crítico": "rojo",
+    "desconocido": "gris",
+}

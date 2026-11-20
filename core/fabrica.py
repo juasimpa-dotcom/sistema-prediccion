@@ -63,14 +63,16 @@ def construir_contexto_desde_csv(
     categoria: str,
     ruta_csv: Path | str = ARCHIVO_VENTAS_CRUDO,
     fecha_corte: str | None = None,
+    semanas: int = 8,
     **sobrescribir: object,
 ) -> ContextoNegocio:
-    """Lee el dataset y devuelve un contexto de 8 semanas para la fachada."""
+    """Lee el dataset y devuelve un contexto de ``semanas`` para la fachada."""
     crudo = pd.read_csv(ruta_csv, parse_dates=["fecha_semana"])
     return contexto_desde_dataframe(
         crudo,
         sucursal,
         categoria,
         fecha_corte=fecha_corte,
+        semanas=semanas,
         **sobrescribir,
     )
