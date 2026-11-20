@@ -14,6 +14,7 @@ acciones y explica sus decisiones.
 | 3 | Sistema experto (reglas y factores de certeza) | Completada |
 | 4 | Lógica difusa e integración con el sistema experto | Completada |
 | 5 | Búsqueda y planificación de acciones comerciales | Completada |
+| 6 | Orquestador que integra todos los componentes | Completada |
 
 ## Estructura
 
@@ -34,6 +35,15 @@ sistema_prediccion/
     informada.py             # Greedy, A* y heurística trivial de comparación
     minimax.py               # Competidor que responde, Minimax y alfa-beta
     benchmark.py             # Escenarios, tablas y gráfico comparativo
+  core/                      # Fachada de integración de la Fase 6
+    contexto.py              # Contexto tipado y traducción a hechos observados
+    resultado.py             # Dataclasses de salida y constructores puros
+    puertos.py               # Protocolos de las dependencias inyectadas
+    planificador.py          # A* parametrizado por el diagnóstico
+    explicacion.py           # Explicación unificada en español
+    sistema.py               # SistemaInteligente.ejecutar(contexto)
+    fabrica.py               # Composition root: instancia e inyecta dependencias
+    demo.py                  # Tres casos: riesgo, normal y exceso de stock
   api/                       # API FastAPI
   app/                       # Dashboard Streamlit
   notebooks/
@@ -262,6 +272,64 @@ python -m search.benchmark  # escenarios fácil, medio, difícil y sin solución
 El benchmark guarda `docs/benchmark_busqueda.csv`,
 `docs/benchmark_busqueda.md` y `docs/figuras/benchmark_busqueda.png` con nodos
 expandidos, costo y tiempo por algoritmo.
+
+## Uso de la Fase 6
+
+`core/sistema.py` define `SistemaInteligente`, una fachada con un único método
+público de negocio: `ejecutar(contexto)`. El flujo es
+**ML → hechos con CF → fuzzificación → inferencia → A* → explicación**:
+
+1. `PredictorVentas` predice la semana siguiente y devuelve factores SHAP.
+2. La confianza calibrada del modelo se reutiliza como factor de certeza de los
+   hechos `prediccion_ventas_bs`, `confianza_modelo`,
+   `cumplimiento_esperado_pct` y `ventas_caida_pct` que se registran en la
+   memoria de trabajo. Los datos observados de la sucursal se registran con CF 1.
+3. El motor fuzzifica los hechos numéricos, aplica el sistema Mamdani y
+   encadena reglas hacia adelante; la traza queda disponible para la explicación.
+4. Las causas con CF positivo se convierten en restricciones: por ejemplo,
+   `merma_alta` desactiva la reasignación y `exceso_stock` impide traer más
+   inventario de otra sucursal. Las restricciones se leen de
+   `RESTRICCIONES_CAUSA_OPERADOR` en `config.py` y se pasan a
+   `ProblemaPlanComercial` mediante los nuevos flags
+   `permitir_reasignacion` y `permitir_reducir_merma` (defaults `True`).
+   A* resuelve el problema con la heurística admisible de la Fase 5.
+5. Se devuelve un `ResultadoSistema` tipado con predicción, confianza,
+   diagnóstico rankeado por CF, riesgo difuso, plan con costo, reglas disparadas,
+   explicación completa y la comparativa simbólico vs. no simbólico (Tema 1).
+
+Todas las dependencias se inyectan por constructor. `core/fabrica.py` es el
+único lugar donde se instancian el modelo, la base de reglas, la memoria, el
+motor difuso, A* y la fachada; las pruebas unitarias sustituyen cualquiera de
+ellos por un doble. `ejecutar` no crea dependencias ni usa globales.
+
+```python
+from core.fabrica import construir_contexto_desde_csv, construir_sistema
+
+sistema = construir_sistema()
+contexto = construir_contexto_desde_csv(
+    "El Alto", "pollo", factor_meta=1.20, stock_cobertura=0.18
+)
+resultado = sistema.ejecutar(contexto)
+
+print(resultado.resumen())
+print(resultado.explicacion)
+print(resultado.comparativa.a_texto())
+```
+
+Demostración con los tres casos representativos (sucursal en riesgo, sucursal
+normal y sucursal con exceso de stock):
+
+```powershell
+python -m core.demo
+```
+
+Las pruebas incluyen dobles para el orquestador y tres flujos reales de extremo
+a extremo sobre `data/raw/ventas_semanales.csv` y
+`models/predictor_ventas.joblib`:
+
+```powershell
+pytest
+```
 
 ## Dataset generado
 

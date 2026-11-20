@@ -729,3 +729,35 @@ RESPUESTA_COMPETIDOR: Final[tuple[float, ...]] = (1.0, 0.94, 0.90)
 ARCHIVO_BENCHMARK_CSV: Final[Path] = DIR_DOCS / "benchmark_busqueda.csv"
 ARCHIVO_BENCHMARK_MD: Final[Path] = DIR_DOCS / "benchmark_busqueda.md"
 ARCHIVO_BENCHMARK_FIGURA: Final[Path] = DIR_DOCS / "figuras" / "benchmark_busqueda.png"
+
+
+# ---------------------------------------------------------------------------
+# Integración de componentes (Fase 6)
+# ---------------------------------------------------------------------------
+# Atributos de la memoria de trabajo que el orquestador consulta para construir
+# el diagnóstico y la explicación unificada.
+ATRIBUTO_CAUSA_VENTAS: Final[str] = "causa_ventas_bajas"
+ATRIBUTO_ACCION_EXPERTA: Final[str] = "accion_recomendada"
+ATRIBUTO_NIVEL_RIESGO: Final[str] = "nivel_riesgo"
+ATRIBUTO_PREDICCION_BS: Final[str] = "prediccion_ventas_bs"
+ATRIBUTO_CONFIANZA_ML: Final[str] = "confianza_modelo"
+
+ORIGEN_ML: Final[str] = "modelo:ml"
+ORIGEN_CONTEXTO: Final[str] = "contexto:sucursal"
+
+# Cobertura de stock a partir de la cual se registra sobrestock como causa.
+# El universo difuso «nivel_stock» declara «excesivo» desde 0.9 hasta 2.0.
+UMBRAL_EXCESO_STOCK: Final[float] = 1.25
+CAUSA_EXCESO_STOCK: Final[str] = "exceso_stock"
+
+PRESUPUESTO_PREDETERMINADO_BS: Final[float] = 9_000.0
+
+# El diagnóstico restringe los operadores de A*. Cada causa puede desactivar
+# operadores; si varias causas opinan, se aplica el AND (el operador solo sigue
+# disponible cuando todas las causas lo permiten).
+RESTRICCIONES_CAUSA_OPERADOR: Final[dict[str, dict[str, bool]]] = {
+    "stock_critico": {"permitir_reasignacion": True, "permitir_reducir_merma": False},
+    "merma_alta": {"permitir_reasignacion": False, "permitir_reducir_merma": True},
+    "exceso_stock": {"permitir_reasignacion": False, "permitir_reducir_merma": True},
+    "operacion_critica": {"permitir_reasignacion": True, "permitir_reducir_merma": False},
+}

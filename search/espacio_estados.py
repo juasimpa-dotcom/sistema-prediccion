@@ -174,6 +174,8 @@ class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):
         personal_maximo: int = PERSONAL_MAXIMO,
         niveles_promocion: tuple[float, ...] = NIVELES_PROMOCION,
         parametros: ParametrosGeneracion = PARAMETROS_GENERACION,
+        permitir_reasignacion: bool = True,
+        permitir_reducir_merma: bool = True,
     ) -> None:
         """Construye y valida una instancia del problema de planificación.
 
@@ -190,6 +192,8 @@ class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):
             personal_maximo: Tope de dotación alcanzable.
             niveles_promocion: Descuentos permitidos, incluido el 0.
             parametros: Elasticidades del generador de datos.
+            permitir_reasignacion: Si se ofrece el operador de reasignación.
+            permitir_reducir_merma: Si se ofrece el operador de reducción de merma.
 
         Raises:
             TypeError: Si ``parametros`` no es del tipo esperado.
@@ -233,6 +237,8 @@ class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):
         self.personal_maximo = int(personal_maximo)
         self.niveles_promocion = tuple(niveles_promocion)
         self.parametros = parametros
+        self.permitir_reasignacion = bool(permitir_reasignacion)
+        self.permitir_reducir_merma = bool(permitir_reducir_merma)
 
         self.personal_referencia = personal_referencia
         self.demanda_base = self.afluencia * TASA_CONVERSION_CATEGORIA[categoria]
@@ -278,13 +284,6 @@ class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):
             / self.personal_referencia
             * self.precio_base
         )
-        self._maxima_ganancia = max(
-            ganancia_repo,
-            ganancia_reasignacion,
-            ganancia_merma,
-            ganancia_promo,
-            ganancia_personal,
-        )
 
         costo_repo = REPOSICION_UNIDADES * COSTO_REPOSICION_POR_UNIDAD_BS
         costo_reasignacion = REASIGNACION_UNIDADES * COSTO_REASIGNACION_POR_UNIDAD_BS
@@ -296,19 +295,25 @@ class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):
             if niveles_positivos
             else math.inf
         )
+
+        # Solo cuentan los operadores realmente ofrecidos. Incluir un operador
+        # desactivado por el diagnóstico sobreestimaría G o E y rompería la
+        # admisibilidad de la heurística.
+        pares: list[tuple[float, float]] = [(ganancia_repo, costo_repo)]
+        if self.permitir_reasignacion:
+            pares.append((ganancia_reasignacion, costo_reasignacion))
+        pares.append((ganancia_personal, costo_personal))
+        pares.append((ganancia_promo, costo_promo))
+        if self.permitir_reducir_merma:
+            pares.append((ganancia_merma, costo_merma))
+
+        self._maxima_ganancia = max((ganancia for ganancia, _ in pares), default=1.0)
         self._costo_minimo = min(
-            costo_repo,
-            costo_reasignacion,
-            costo_personal,
-            costo_merma,
-            costo_promo,
+            (costo for _, costo in pares if math.isfinite(costo)), default=math.inf
         )
         self._maxima_eficiencia = max(
-            ganancia_repo / costo_repo,
-            ganancia_reasignacion / costo_reasignacion,
-            ganancia_personal / costo_personal,
-            ganancia_merma / costo_merma,
-            ganancia_promo / costo_promo if math.isfinite(costo_promo) else 0.0,
+            (ganancia / costo for ganancia, costo in pares if math.isfinite(costo) and costo > 0),
+            default=1.0,
         )
 
     def estado_inicial(self) -> EstadoPlan:
@@ -369,10 +374,14 @@ class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):
         )
         if estado.stock < self.stock_maximo:
             candidatas.append(Accion(TipoAccion.REPONER_STOCK))
-            candidatas.append(Accion(TipoAccion.REASIGNAR_INVENTARIO))
+            if self.permitir_reasignacion:
+                candidatas.append(Accion(TipoAccion.REASIGNAR_INVENTARIO))
         if estado.personal < self.personal_maximo:
             candidatas.append(Accion(TipoAccion.REFORZAR_PERSONAL))
-        if estado.merma_pct - REDUCCION_MERMA_PP >= MERMA_MINIMA_PCT:
+        if (
+            self.permitir_reducir_merma
+            and estado.merma_pct - REDUCCION_MERMA_PP >= MERMA_MINIMA_PCT
+        ):
             candidatas.append(Accion(TipoAccion.REDUCIR_MERMA))
         return tuple(
             accion
