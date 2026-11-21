@@ -183,6 +183,25 @@ class RiesgoDTO(BaseModel):
     semaforo: str = Field(description="Color del semáforo: verde, amarillo, naranja o rojo")
 
 
+class NodoBusquedaDTO(BaseModel):
+    """Estado visitado por A*, listo para dibujar en el dashboard."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int = Field(description="Identificador del nodo dentro de la búsqueda")
+    padre_id: int | None = Field(description="Nodo que generó este estado")
+    estado: str = Field(description="Resumen legible del estado")
+    accion: str = Field(description="Acción aplicada para llegar al estado")
+    profundidad: int = Field(description="Acciones acumuladas desde el inicio")
+    costo_bs: float = Field(description="Costo acumulado hasta el estado")
+    heuristica: float | None = Field(description="Estimación restante, si aplica")
+    f: float | None = Field(description="Costo estimado total g + h, si aplica")
+    expandido: bool = Field(description="Si el estado fue evaluado")
+    es_meta: bool = Field(description="Si el estado alcanza la meta")
+    descartado: bool = Field(description="Si se descartó por repetido o por costo")
+    orden_expansion: int | None = Field(description="Orden en que se expandió")
+
+
 class PlanDTO(BaseModel):
     """Plan de acciones devuelto por A*."""
 
@@ -195,6 +214,9 @@ class PlanDTO(BaseModel):
     nodos_expandidos: int = Field(description="Estados evaluados por la búsqueda")
     restricciones: list[str] = Field(description="Operadores excluidos por el diagnóstico")
     justificacion: str = Field(description="Por qué el diagnóstico conduce a este plan")
+    nodos_generados: int = Field(description="Estados creados durante la búsqueda")
+    profundidad: int = Field(description="Cantidad de acciones del plan")
+    nodos: list[NodoBusquedaDTO] = Field(description="Trazas de estados visitados por A*")
 
 
 class ComparativaDTO(BaseModel):

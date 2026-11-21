@@ -158,4 +158,7 @@ class PlanificadorComercial:
             nodos_expandidos=resultado.nodos_expandidos,
             restricciones=restricciones,
             justificacion=_justificacion(solicitud.causas, restricciones, resultado),
+            nodos_generados=resultado.nodos_generados,
+            profundidad=resultado.profundidad,
+            nodos=resultado.nodos,
         )

@@ -16,7 +16,7 @@ from collections.abc import Callable, Hashable
 from typing import TypeVar
 
 from search.espacio_estados import Problema
-from search.resultado import Resultado
+from search.resultado import NodoBusqueda, RegistroNodos, Resultado
 
 EstadoT = TypeVar("EstadoT", bound=Hashable)
 AccionT = TypeVar("AccionT", bound=Hashable)
@@ -60,6 +60,7 @@ def _resultado(
     expandidos: int,
     generados: int,
     encontrado: bool,
+    nodos: tuple[NodoBusqueda, ...] = (),
 ) -> Resultado:
     """Construye el resultado común con el tiempo transcurrido."""
     return Resultado(
@@ -72,6 +73,7 @@ def _resultado(
         encontrado=encontrado,
         algoritmo=algoritmo,
         escenario=getattr(problema, "descripcion", type(problema).__name__),
+        nodos=nodos,
     )
 
 
@@ -95,35 +97,77 @@ def busqueda_voraz(
     estimar = _resolver_heuristica(problema, heuristica)
     inicial = problema.estado_inicial()
     contador = itertools.count()
+    h_inicial = estimar(inicial)
     frontera: list[tuple[float, int, EstadoT, tuple[Hashable, ...], float]] = [
-        (estimar(inicial), next(contador), inicial, (), 0.0)
+        (h_inicial, next(contador), inicial, (), 0.0)
     ]
     visitados: set[EstadoT] = {inicial}
+    registro = RegistroNodos()
+    registro.registrar(inicial, heuristica_h=h_inicial, f=h_inicial)
     expandidos = generados = 0
 
     while frontera:
-        _, _, estado, plan, costo = heapq.heappop(frontera)
+        h_actual, _, estado, plan, costo = heapq.heappop(frontera)
         expandidos += 1
-        if problema.es_meta(estado):
-            return _resultado("Greedy", problema, inicio, plan, costo, expandidos, generados, True)
+        es_meta = problema.es_meta(estado)
+        id_actual = registro.registrar(
+            estado,
+            heuristica_h=h_actual,
+            f=h_actual,
+            expandido=True,
+            es_meta=es_meta,
+            orden_expansion=expandidos,
+        )
+        if es_meta:
+            return _resultado(
+                "Greedy",
+                problema,
+                inicio,
+                plan,
+                costo,
+                expandidos,
+                generados,
+                True,
+                registro.nodos(),
+            )
         for accion in problema.acciones(estado):
             generados += 1
             sucesor = problema.resultado(estado, accion)
             if sucesor in visitados:
+                registro.registrar(
+                    sucesor,
+                    padre_id=id_actual,
+                    accion=str(accion),
+                    profundidad=len(plan) + 1,
+                    descartado=True,
+                )
                 continue
             visitados.add(sucesor)
+            h = estimar(sucesor)
+            nuevo_costo = round(costo + problema.costo_paso(estado, accion), 2)
+            registro.registrar(
+                sucesor,
+                padre_id=id_actual,
+                accion=str(accion),
+                profundidad=len(plan) + 1,
+                costo_g=nuevo_costo,
+                heuristica_h=h,
+                f=h,
+            )
             heapq.heappush(
                 frontera,
                 (
-                    estimar(sucesor),
+                    h,
                     next(contador),
                     sucesor,
                     (*plan, accion),
-                    round(costo + problema.costo_paso(estado, accion), 2),
+                    nuevo_costo,
                 ),
             )
 
-    return _resultado("Greedy", problema, inicio, (), 0.0, expandidos, generados, False)
+    return _resultado(
+        "Greedy", problema, inicio, (), 0.0, expandidos, generados, False, registro.nodos()
+    )
 
 
 def a_estrella(
@@ -161,27 +205,67 @@ def a_estrella(
         (h_inicial, h_inicial, next(contador), inicial, (), 0.0)
     ]
     mejor: dict[EstadoT, float] = {inicial: 0.0}
+    registro = RegistroNodos()
+    registro.registrar(inicial, heuristica_h=h_inicial, f=h_inicial)
     expandidos = generados = 0
 
     while frontera:
-        _, _, _, estado, plan, costo = heapq.heappop(frontera)
+        f_actual, h_actual, _, estado, plan, costo = heapq.heappop(frontera)
         if costo > mejor.get(estado, math.inf) + 1e-9:
+            registro.registrar(estado, descartado=True)
             continue
         expandidos += 1
-        if problema.es_meta(estado):
-            return _resultado("A*", problema, inicio, plan, costo, expandidos, generados, True)
+        es_meta = problema.es_meta(estado)
+        id_actual = registro.registrar(
+            estado,
+            heuristica_h=h_actual,
+            f=f_actual,
+            expandido=True,
+            es_meta=es_meta,
+            orden_expansion=expandidos,
+        )
+        if es_meta:
+            return _resultado(
+                "A*",
+                problema,
+                inicio,
+                plan,
+                costo,
+                expandidos,
+                generados,
+                True,
+                registro.nodos(),
+            )
         for accion in problema.acciones(estado):
             generados += 1
             sucesor = problema.resultado(estado, accion)
             nuevo_costo = round(costo + problema.costo_paso(estado, accion), 2)
             if nuevo_costo >= mejor.get(sucesor, math.inf):
+                registro.registrar(
+                    sucesor,
+                    padre_id=id_actual,
+                    accion=str(accion),
+                    profundidad=len(plan) + 1,
+                    costo_g=nuevo_costo,
+                    descartado=True,
+                )
                 continue
             mejor[sucesor] = nuevo_costo
             h = estimar(sucesor)
+            f = nuevo_costo + peso * h
+            registro.registrar(
+                sucesor,
+                padre_id=id_actual,
+                accion=str(accion),
+                profundidad=len(plan) + 1,
+                costo_g=nuevo_costo,
+                heuristica_h=h,
+                f=f,
+            )
             heapq.heappush(
                 frontera,
                 (
-                    nuevo_costo + peso * h,
+                    f,
                     h,
                     next(contador),
                     sucesor,
@@ -190,4 +274,6 @@ def a_estrella(
                 ),
             )
 
-    return _resultado("A*", problema, inicio, (), 0.0, expandidos, generados, False)
+    return _resultado(
+        "A*", problema, inicio, (), 0.0, expandidos, generados, False, registro.nodos()
+    )

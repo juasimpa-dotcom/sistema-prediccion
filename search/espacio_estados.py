@@ -114,6 +114,19 @@ class Accion:
             return f"reforzar_personal(+{INCREMENTO_PERSONAL})"
         return f"reducir_merma(-{REDUCCION_MERMA_PP:g}pp)"
 
+    @property
+    def etiqueta(self) -> str:
+        """Devuelve el operador con etiquetas en español para la interfaz."""
+        if self.tipo == TipoAccion.PROMOCION:
+            return f"Promoción {self.nivel:.0f} %"
+        if self.tipo == TipoAccion.REPONER_STOCK:
+            return f"Reponer stock (+{REPOSICION_UNIDADES} u)"
+        if self.tipo == TipoAccion.REASIGNAR_INVENTARIO:
+            return f"Reasignar inventario (+{REASIGNACION_UNIDADES} u)"
+        if self.tipo == TipoAccion.REFORZAR_PERSONAL:
+            return f"Reforzar personal (+{INCREMENTO_PERSONAL})"
+        return f"Reducir merma (−{REDUCCION_MERMA_PP:g} pp)"
+
     def __str__(self) -> str:
         """Usa la descripción legible al imprimir el plan."""
         return self.descripcion
@@ -138,6 +151,24 @@ class EstadoPlan:
     merma_pct: float
     ventas_proyectadas: float
     presupuesto_restante: float
+
+    @property
+    def etiqueta(self) -> str:
+        """Resume el estado con magnitudes comprensibles para una persona."""
+        return (
+            f"Stock {self.stock} u · descuento {self.descuento_pct:g} % · "
+            f"personal {self.personal} · merma {self.merma_pct:g} % · "
+            f"Bs {self.ventas_proyectadas:,.0f}"
+        )
+
+    @property
+    def detalle(self) -> str:
+        """Añade el presupuesto disponible al resumen del estado."""
+        return f"{self.etiqueta} · presupuesto libre Bs {self.presupuesto_restante:,.0f}"
+
+    def __str__(self) -> str:
+        """Muestra el estado legible en la traza de nodos."""
+        return self.etiqueta
 
 
 class ProblemaPlanComercial(Problema[EstadoPlan, Accion]):

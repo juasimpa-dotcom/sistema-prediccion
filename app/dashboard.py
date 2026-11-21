@@ -20,6 +20,16 @@ import httpx
 import plotly.graph_objects as go
 import streamlit as st
 
+from app.visualizacion import (
+    categoria_nodo,
+    etiqueta,
+    grafo_nodos,
+    id_regla,
+    linea_tiempo_nodos,
+    primera_frase,
+    resumen_nodos,
+    ruta_solucion,
+)
 from config import DASHBOARD_API_URL, DASHBOARD_TIMEOUT_S
 
 COLORES_SEMAFORO: dict[str, str] = {
@@ -29,12 +39,10 @@ COLORES_SEMAFORO: dict[str, str] = {
     "rojo": "#c62828",
     "gris": "#757575",
 }
-"""Colores hexadecimales asociados a cada nivel del semáforo."""
 
 PATRON_FACTOR = re.compile(
     r"^(?P<variable>.+?):\s*(?P<signo>[+-])(?P<valor>[\d.,]+)\s*Bs\s*\((?P<detalle>.*)\)$"
 )
-"""Expresión para convertir los factores SHAP legibles en barras."""
 
 
 def mensaje_error(exc: Exception) -> str:
@@ -154,7 +162,7 @@ def grafico_causas(causas: list[dict[str, Any]]) -> go.Figure:
     figura = go.Figure(
         go.Bar(
             x=[abs(causa["cf"]) for causa in ordenadas],
-            y=[causa["causa"] for causa in ordenadas],
+            y=[etiqueta(causa["causa"]) for causa in ordenadas],
             orientation="h",
             marker={"color": "#5e35b1"},
             text=[f"{causa['cf']:+.3f}" for causa in ordenadas],
@@ -163,8 +171,8 @@ def grafico_causas(causas: list[dict[str, Any]]) -> go.Figure:
         )
     )
     figura.update_layout(
-        title="Causas diagnosticadas (factor de certeza)",
-        xaxis_title="|CF|",
+        title="Causas diagnosticadas",
+        xaxis_title="Certeza (valor absoluto)",
         yaxis_title="Causa",
         height=max(220, 70 * len(ordenadas)),
         margin={"l": 40, "r": 20, "t": 60, "b": 40},
@@ -184,9 +192,9 @@ def factores_shap_como_datos(factores: list[str]) -> list[dict[str, Any]]:
             valor = -valor
         datos.append(
             {
-                "variable": coincidencia.group("variable"),
+                "variable": etiqueta(coincidencia.group("variable")),
                 "valor": valor,
-                "detalle": coincidencia.group("detalle"),
+                "detalle": etiqueta(coincidencia.group("detalle")),
             }
         )
     return datos
@@ -208,8 +216,8 @@ def grafico_shap(datos: list[dict[str, Any]]) -> go.Figure:
     )
     figura.add_vline(x=0, line={"color": "#455a64", "width": 1})
     figura.update_layout(
-        title="Aporte SHAP a la predicción",
-        xaxis_title="Bs sobre la predicción",
+        title="Qué explica la proyección",
+        xaxis_title="Aporte a la proyección (Bs)",
         yaxis_title="Variable",
         height=max(240, 65 * len(ordenados)),
         margin={"l": 40, "r": 20, "t": 60, "b": 40},
@@ -218,22 +226,23 @@ def grafico_shap(datos: list[dict[str, Any]]) -> go.Figure:
 
 
 def grafico_benchmark(filas: list[dict[str, Any]]) -> go.Figure:
-    """Compara nodos expandidos por algoritmo dentro de un escenario."""
+    """Compara estados evaluados por algoritmo dentro de un escenario."""
     ordenadas = sorted(filas, key=lambda fila: fila["nodos_expandidos"])
+    nombres = [etiqueta(fila["algoritmo"]) for fila in ordenadas]
     figura = go.Figure(
         go.Bar(
             x=[fila["nodos_expandidos"] for fila in ordenadas],
-            y=[fila["algoritmo"] for fila in ordenadas],
+            y=nombres,
             orientation="h",
             marker_color=["#1565c0" if fila["encontrado"] else "#90a4ae" for fila in ordenadas],
-            text=[fila["algoritmo"] for fila in ordenadas],
+            text=nombres,
             textposition="outside",
             cliponaxis=False,
         )
     )
     figura.update_layout(
-        title="Nodos expandidos por algoritmo",
-        xaxis_title="Nodos expandidos",
+        title="Estados evaluados por algoritmo",
+        xaxis_title="Estados evaluados",
         yaxis_title="Algoritmo",
         height=max(260, 45 * len(ordenadas)),
         margin={"l": 40, "r": 60, "t": 60, "b": 40},
@@ -246,22 +255,23 @@ def mostrar_resumen(analisis: dict[str, Any]) -> None:
     prediccion = analisis["prediccion"]
     riesgo = analisis["riesgo"]
     color = COLORES_SEMAFORO.get(riesgo["semaforo"], COLORES_SEMAFORO["gris"])
+    nivel = etiqueta(riesgo["etiqueta"])
+    semaforo = etiqueta(riesgo["semaforo"])
 
-    st.subheader("Predicción y proyección")
+    st.subheader("Panorama de la semana")
     columnas = st.columns(4)
     columnas[0].metric("Ventas proyectadas", f"{prediccion['valor_predicho_bs']:,.0f} Bs")
     columnas[1].metric("Cumplimiento esperado", f"{analisis['cumplimiento_pct']:.1f} %")
     columnas[2].metric("Confianza del modelo", f"{prediccion['confianza']:.2f}")
-    columnas[3].metric("Meta efectiva", f"{analisis['proyeccion']['meta_bs']:,.0f} Bs")
+    columnas[3].metric("Meta de ventas", f"{analisis['proyeccion']['meta_bs']:,.0f} Bs")
 
     st.markdown(
-        f"### Semáforo de riesgo: <span style='color:{color}'>● {riesgo['etiqueta']} "
-        f"({riesgo['semaforo']})</span>",
+        f"### Riesgo: <span style='color:{color}'>● {nivel} · {semaforo}</span>",
         unsafe_allow_html=True,
     )
     st.caption(
-        f"Centroide {riesgo['valor']:.1f} · pertenencia {riesgo['grado']:.3f} · "
-        f"urgencia: {riesgo['urgencia']}"
+        f"Nivel difuso {riesgo['valor']:.1f} · certeza {riesgo['grado']:.0%} · "
+        f"urgencia {etiqueta(riesgo['urgencia'])}"
     )
 
     st.plotly_chart(grafico_historico(analisis), width="stretch")
@@ -272,16 +282,20 @@ def mostrar_diagnostico(analisis: dict[str, Any]) -> None:
     st.subheader("Diagnóstico: causas y certeza")
     causas = analisis["causas"]
     if not causas:
-        st.info("No se diagnosticaron causas con factor de certeza positivo.")
+        st.info("No se diagnosticaron causas con certeza positiva.")
     else:
         st.plotly_chart(grafico_causas(causas), width="stretch")
         st.dataframe(
             [
                 {
-                    "Causa": causa["causa"],
-                    "CF": causa["cf"],
-                    "Descripción": causa["descripcion"],
-                    "Reglas": ", ".join(causa["reglas"]) or "hecho del contexto",
+                    "Causa": etiqueta(causa["causa"]),
+                    "Certeza": f"{causa['cf']:+.3f}",
+                    "Evidencia": primera_frase(causa["descripcion"]),
+                    "Reglas aplicadas": ", ".join(
+                        id_regla(regla)[0] or primera_frase(id_regla(regla)[1])
+                        for regla in causa["reglas"]
+                    )
+                    or "hecho del contexto",
                 }
                 for causa in causas
             ],
@@ -291,39 +305,43 @@ def mostrar_diagnostico(analisis: dict[str, Any]) -> None:
     with st.expander("Detalle del riesgo difuso"):
         st.write(analisis["riesgo"]["descripcion"])
         st.write(
-            "Reglas difusas activadas: "
-            + (", ".join(analisis["riesgo"]["reglas_activadas"]) or "ninguna")
+            "Reglas activadas: " + (", ".join(analisis["riesgo"]["reglas_activadas"]) or "ninguna")
         )
 
 
 def mostrar_plan(analisis: dict[str, Any]) -> None:
     """Muestra el plan de acciones y su justificación."""
-    st.subheader("Plan de acciones recomendado")
+    st.subheader("Plan recomendado")
     plan = analisis["plan"]
     if plan["encontrado"]:
-        st.success("A* encontró un plan dentro del presupuesto.")
+        st.success("La búsqueda encontró un plan dentro del presupuesto.")
     else:
-        st.warning("A* no encontró un plan dentro del presupuesto.")
+        st.warning("No se encontró un plan dentro del presupuesto.")
     columnas = st.columns(3)
     columnas[0].metric("Costo estimado", f"{plan['costo_bs']:,.0f} Bs")
-    columnas[1].metric("Nodos expandidos", f"{plan['nodos_expandidos']:,}")
+    columnas[1].metric("Estados evaluados", f"{plan['nodos_expandidos']:,}")
     columnas[2].metric("Acciones", str(len(plan["acciones"])))
 
     if plan["acciones"]:
         for numero, accion in enumerate(plan["acciones"], start=1):
-            st.write(f"{numero}. {accion}")
+            st.markdown(f"{numero}. {etiqueta(accion)}")
     else:
         st.info("No se requieren acciones adicionales.")
-    st.info(plan["justificacion"])
+
+    if plan["justificacion"]:
+        st.caption(primera_frase(plan["justificacion"]))
+        with st.expander("Por qué se eligió este plan"):
+            st.write(plan["justificacion"])
     if plan["restricciones"]:
         st.caption(
-            "Operadores restringidos por el diagnóstico: " + ", ".join(plan["restricciones"])
+            "Acciones no permitidas por el diagnóstico: "
+            + ", ".join(etiqueta(restriccion) for restriccion in plan["restricciones"])
         )
 
 
 def mostrar_por_que(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
     """Muestra la explicación unificada y el gráfico SHAP desde la API."""
-    st.subheader("¿Por qué?")
+    st.subheader("Por qué esta predicción")
     try:
         explicacion = cargar_explicacion(cliente, analisis["id"])
     except Exception as exc:
@@ -331,7 +349,8 @@ def mostrar_por_que(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
         explicacion = None
 
     if explicacion is not None:
-        with st.expander("Explicación unificada", expanded=True):
+        st.caption(primera_frase(explicacion["texto"]))
+        with st.expander("Lectura completa"):
             st.write(explicacion["texto"])
 
     factores = (
@@ -343,42 +362,103 @@ def mostrar_por_que(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
     if datos:
         st.plotly_chart(grafico_shap(datos), width="stretch")
     else:
-        st.warning("La API no devolvió factores SHAP interpretables para esta predicción.")
-        for texto in factores:
-            st.write(f"- {texto}")
+        st.warning("La API no devolvió factores interpretables para esta predicción.")
+        with st.expander("Ver datos recibidos"):
+            st.code("\n".join(str(texto) for texto in factores), language="text")
+
+
+def mostrar_exploracion_estados(plan: dict[str, Any]) -> None:
+    """Muestra la traza real de A* como grafo interactivo y línea de tiempo."""
+    nodos = plan.get("nodos", [])
+    if not nodos:
+        st.info(
+            "La respuesta actual no incluye la traza de estados. "
+            "Vuelve a analizar con la API actualizada para verla."
+        )
+        return
+
+    resumen = resumen_nodos(nodos)
+    columnas = st.columns(4)
+    columnas[0].metric("Estados evaluados", f"{resumen['expandidos']:,}")
+    columnas[1].metric("Estados creados", f"{resumen['creados']:,}")
+    columnas[2].metric("Descartados", f"{resumen['descartados']:,}")
+    columnas[3].metric("Estados en la solución", f"{resumen['en_ruta']:,}")
+
+    st.plotly_chart(grafo_nodos(nodos), width="stretch")
+    st.plotly_chart(linea_tiempo_nodos(nodos), width="stretch")
+
+    camino = ruta_solucion(nodos)
+    expandidos = sorted(
+        (nodo for nodo in nodos if nodo.get("expandido")),
+        key=lambda nodo: nodo.get("orden_expansion") or 0,
+    )
+    st.markdown("#### Secuencia de decisiones")
+    st.dataframe(
+        [
+            {
+                "Orden": nodo.get("orden_expansion"),
+                "Acción": etiqueta(nodo["accion"]) if nodo.get("accion") else "Inicio",
+                "Costo (Bs)": f"{nodo.get('costo_bs', 0):,.0f}",
+                "Pasos": nodo.get("profundidad", 0),
+                "Resultado": etiqueta(categoria_nodo(nodo, camino)),
+            }
+            for nodo in expandidos
+        ],
+        width="stretch",
+        hide_index=True,
+        height=260,
+    )
+
+    with st.expander("Cómo leer esta vista"):
+        st.markdown(
+            "- Cada círculo es un estado real que la búsqueda creó o evaluó.\n"
+            "- La línea dorada marca la ruta hasta la meta.\n"
+            "- Los puntos grises se descartaron por repetidos o por costo.\n"
+            "- El gráfico inferior sigue el orden exacto de evaluación y el costo acumulado."
+        )
 
 
 def mostrar_pestanas(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
-    """Muestra las pestañas comparativa, traza de reglas y comparación de IA."""
-    pestana_benchmark, pestana_reglas, pestana_ia = st.tabs(
+    """Muestra exploración de estados, comparativa, reglas y enfoques de IA."""
+    pestana_estados, pestana_benchmark, pestana_reglas, pestana_ia = st.tabs(
         [
+            "Exploración de estados",
             "Comparación de algoritmos",
-            "Reglas disparadas (traza)",
-            "IA simbólica vs. no simbólica",
+            "Reglas aplicadas",
+            "IA: dos enfoques",
         ]
     )
 
+    with pestana_estados:
+        mostrar_exploracion_estados(analisis["plan"])
+
     with pestana_benchmark:
-        st.markdown("Métricas del benchmark de búsqueda de la Fase 5.")
+        st.caption("Cómo se comportaron los algoritmos en escenarios de prueba.")
         benchmark = cargar_benchmark(cliente)
         if benchmark is not None:
-            opciones = ["Todos", *benchmark["escenarios"]]
-            escenario = st.selectbox("Escenario", opciones, key="escenario_benchmark")
+            escenarios = {etiqueta(nombre): nombre for nombre in benchmark["escenarios"]}
+            opciones = ["Todos", *escenarios]
+            seleccion = st.selectbox("Escenario", opciones, key="escenario_benchmark")
             filas = (
                 benchmark["filas"]
-                if escenario == "Todos"
-                else [fila for fila in benchmark["filas"] if fila["escenario"] == escenario]
+                if seleccion == "Todos"
+                else [
+                    fila
+                    for fila in benchmark["filas"]
+                    if fila["escenario"] == escenarios[seleccion]
+                ]
             )
             if filas:
                 st.plotly_chart(grafico_benchmark(filas), width="stretch")
                 st.dataframe(
                     [
                         {
-                            "Algoritmo": fila["algoritmo"],
-                            "Escenario": fila["escenario"],
-                            "Encontró solución": "sí" if fila["encontrado"] else "no",
+                            "Algoritmo": etiqueta(fila["algoritmo"]),
+                            "Escenario": etiqueta(fila["escenario"]).capitalize(),
+                            "Llegó a la meta": "sí" if fila["encontrado"] else "no",
                             "Costo (Bs)": fila["costo"],
-                            "Nodos expandidos": fila["nodos_expandidos"],
+                            "Estados evaluados": fila["nodos_expandidos"],
+                            "Estados creados": fila["nodos_generados"],
                             "Tiempo (s)": fila["tiempo"],
                         }
                         for fila in filas
@@ -388,26 +468,44 @@ def mostrar_pestanas(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
                 )
 
     with pestana_reglas:
-        st.markdown("Reglas crisp disparadas por el motor de inferencia, en orden de ejecución.")
+        st.caption("Reglas aplicadas por el motor de inferencia, en orden de ejecución.")
         reglas = analisis["reglas_disparadas"]
         if reglas:
             for numero, regla in enumerate(reglas, start=1):
-                st.code(f"{numero:02d}. {regla}", language="text")
+                identificador, descripcion = id_regla(regla)
+                titulo = (
+                    f"**{identificador}** · {primera_frase(descripcion)}"
+                    if identificador
+                    else primera_frase(descripcion)
+                )
+                st.markdown(f"{numero:02d}. {titulo}")
+            with st.expander("Ver texto original de las reglas"):
+                st.code(
+                    "\n".join(f"{numero:02d}. {regla}" for numero, regla in enumerate(reglas, 1)),
+                    language="text",
+                )
         else:
-            st.info("El motor no disparó reglas crisp en esta ejecución.")
-        st.caption("Las reglas difusas activadas se detallan en la sección de diagnóstico.")
+            st.info("El motor no aplicó reglas en esta ejecución.")
+        st.caption("Las reglas difusas activadas se detallan en el diagnóstico.")
 
     with pestana_ia:
         comparativa = analisis["comparativa"]
         columnas = st.columns(2)
-        columnas[0].subheader("No simbólica (Machine Learning)")
-        columnas[0].write(comparativa["aporte_ml"])
-        columnas[1].subheader("Simbólica (experto + difuso)")
-        columnas[1].write(comparativa["aporte_experto"])
-        st.subheader("Complementariedad")
-        st.write(comparativa["complementariedad"])
-        st.subheader("Evidencia de esta ejecución")
-        st.write(comparativa["evidencia"])
+        with columnas[0]:
+            st.subheader("Machine Learning")
+            st.caption(primera_frase(comparativa["aporte_ml"]))
+            with st.expander("Detalle"):
+                st.write(comparativa["aporte_ml"])
+        with columnas[1]:
+            st.subheader("Experto + difuso")
+            st.caption(primera_frase(comparativa["aporte_experto"]))
+            with st.expander("Detalle"):
+                st.write(comparativa["aporte_experto"])
+        st.subheader("Cómo se complementan")
+        st.caption(primera_frase(comparativa["complementariedad"]))
+        with st.expander("Evidencia de esta ejecución"):
+            st.write(comparativa["evidencia"])
+            st.write(comparativa["complementariedad"])
 
 
 def construir_payload(
@@ -447,8 +545,8 @@ def main() -> None:
     )
     st.title("Sistema inteligente de predicción de ventas")
     st.caption(
-        "Predicción con SHAP, diagnóstico con factores de certeza, riesgo difuso "
-        "y planificación con A*. Todos los datos provienen de la API REST."
+        "Predicción, diagnóstico y planificación alimentados por la API REST. "
+        "La pestaña «Exploración de estados» muestra el recorrido real de A*."
     )
 
     url_api = st.sidebar.text_input("URL base de la API", value=DASHBOARD_API_URL)

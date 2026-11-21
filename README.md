@@ -266,7 +266,9 @@ python -m core.demo
 .\venv\Scripts\python.exe -m streamlit run app/dashboard.py --server.port 8501
 ```
 
-Abra <http://localhost:8501>. Documentación interactiva de la API:
+Abra <http://localhost:8501>. La pestaña «Exploración de estados» muestra el
+grafo real de A* y la secuencia de evaluaciones; el resto de la interfaz usa
+etiquetas en español. Documentación interactiva de la API:
 <http://localhost:8000/docs> y <http://localhost:8000/redoc>.
 
 ---
@@ -277,7 +279,7 @@ Abra <http://localhost:8501>. Documentación interactiva de la API:
 | ------ | -------- | ----------- |
 | `POST` | `/predecir` | Predicción, confianza, factores SHAP, histórico y proyección. |
 | `POST` | `/diagnosticar` | Causas con factor de certeza, riesgo difuso y semáforo. |
-| `POST` | `/planificar` | Plan de A* con costo, restricciones y justificación. |
+| `POST` | `/planificar` | Plan de A* con costo, restricciones, justificación y traza de estados. |
 | `POST` | `/analisis-completo` | Respuesta integral consumida por el dashboard. |
 | `GET` | `/explicar/{id}` | Explicación de un análisis guardado, recuperada por UUID. |
 | `GET` | `/salud` | Estado del servicio y de los artefactos requeridos. |

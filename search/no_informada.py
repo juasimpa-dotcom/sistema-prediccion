@@ -16,7 +16,7 @@ from collections.abc import Hashable
 from typing import TypeVar
 
 from search.espacio_estados import Problema
-from search.resultado import Resultado
+from search.resultado import NodoBusqueda, RegistroNodos, Resultado
 
 EstadoT = TypeVar("EstadoT", bound=Hashable)
 AccionT = TypeVar("AccionT", bound=Hashable)
@@ -32,6 +32,7 @@ def _resultado(
     generados: int,
     profundidad: int,
     encontrado: bool,
+    nodos: tuple[NodoBusqueda, ...] = (),
 ) -> Resultado:
     """Construye el resultado común con el tiempo transcurrido."""
     return Resultado(
@@ -44,6 +45,7 @@ def _resultado(
         encontrado=encontrado,
         algoritmo=algoritmo,
         escenario=getattr(problema, "descripcion", type(problema).__name__),
+        nodos=nodos,
     )
 
 
@@ -70,15 +72,33 @@ def busqueda_amplitud(
         [(inicial, (), 0.0, 0)]
     )
     visitados: set[EstadoT] = {inicial}
+    registro = RegistroNodos()
+    registro.registrar(inicial)
     expandidos = generados = maxima = 0
 
     while frontera:
         estado, plan, costo, profundidad = frontera.popleft()
         expandidos += 1
         maxima = max(maxima, profundidad)
-        if problema.es_meta(estado):
+        es_meta = problema.es_meta(estado)
+        id_actual = registro.registrar(
+            estado,
+            expandido=True,
+            es_meta=es_meta,
+            orden_expansion=expandidos,
+        )
+        if es_meta:
             return _resultado(
-                "BFS", problema, inicio, plan, costo, expandidos, generados, len(plan), True
+                "BFS",
+                problema,
+                inicio,
+                plan,
+                costo,
+                expandidos,
+                generados,
+                len(plan),
+                True,
+                registro.nodos(),
             )
         if limite_profundidad is not None and profundidad >= limite_profundidad:
             continue
@@ -86,12 +106,37 @@ def busqueda_amplitud(
             generados += 1
             sucesor = problema.resultado(estado, accion)
             if sucesor in visitados:
+                registro.registrar(
+                    sucesor,
+                    padre_id=id_actual,
+                    accion=str(accion),
+                    profundidad=profundidad + 1,
+                    descartado=True,
+                )
                 continue
             visitados.add(sucesor)
             nuevo_costo = round(costo + problema.costo_paso(estado, accion), 2)
+            registro.registrar(
+                sucesor,
+                padre_id=id_actual,
+                accion=str(accion),
+                profundidad=profundidad + 1,
+                costo_g=nuevo_costo,
+            )
             frontera.append((sucesor, (*plan, accion), nuevo_costo, profundidad + 1))
 
-    return _resultado("BFS", problema, inicio, (), 0.0, expandidos, generados, maxima, False)
+    return _resultado(
+        "BFS",
+        problema,
+        inicio,
+        (),
+        0.0,
+        expandidos,
+        generados,
+        maxima,
+        False,
+        registro.nodos(),
+    )
 
 
 def busqueda_profundidad(
@@ -121,15 +166,33 @@ def busqueda_profundidad(
     # posterior con menos pasos restantes sí puede conducir a la meta dentro del
     # límite, así que no debe descartarse.
     mejor_profundidad: dict[EstadoT, int] = {inicial: 0}
+    registro = RegistroNodos()
+    registro.registrar(inicial)
     expandidos = generados = maxima = 0
 
     while frontera:
         estado, plan, costo, profundidad = frontera.pop()
         expandidos += 1
         maxima = max(maxima, profundidad)
-        if problema.es_meta(estado):
+        es_meta = problema.es_meta(estado)
+        id_actual = registro.registrar(
+            estado,
+            expandido=True,
+            es_meta=es_meta,
+            orden_expansion=expandidos,
+        )
+        if es_meta:
             return _resultado(
-                "DFS", problema, inicio, plan, costo, expandidos, generados, len(plan), True
+                "DFS",
+                problema,
+                inicio,
+                plan,
+                costo,
+                expandidos,
+                generados,
+                len(plan),
+                True,
+                registro.nodos(),
             )
         if profundidad >= limite:
             continue
@@ -139,9 +202,25 @@ def busqueda_profundidad(
             sucesor = problema.resultado(estado, accion)
             nueva_profundidad = profundidad + 1
             if mejor_profundidad.get(sucesor, math.inf) <= nueva_profundidad:
+                registro.registrar(
+                    sucesor,
+                    padre_id=id_actual,
+                    accion=str(accion),
+                    profundidad=nueva_profundidad,
+                    descartado=True,
+                )
                 continue
             mejor_profundidad[sucesor] = nueva_profundidad
-            sucesores.append((sucesor, accion, problema.costo_paso(estado, accion)))
+            costo_paso = problema.costo_paso(estado, accion)
+            nuevo_costo = round(costo + costo_paso, 2)
+            registro.registrar(
+                sucesor,
+                padre_id=id_actual,
+                accion=str(accion),
+                profundidad=nueva_profundidad,
+                costo_g=nuevo_costo,
+            )
+            sucesores.append((sucesor, accion, costo_paso))
         # Se apilan en orden inverso para respetar el orden declarado de acciones.
         for sucesor, accion_paso, costo_paso in reversed(sucesores):
             frontera.append(
@@ -153,7 +232,18 @@ def busqueda_profundidad(
                 )
             )
 
-    return _resultado("DFS", problema, inicio, (), 0.0, expandidos, generados, maxima, False)
+    return _resultado(
+        "DFS",
+        problema,
+        inicio,
+        (),
+        0.0,
+        expandidos,
+        generados,
+        maxima,
+        False,
+        registro.nodos(),
+    )
 
 
 def backtracking(
@@ -184,6 +274,7 @@ def backtracking(
     inicio = time.perf_counter()
     expandidos = generados = maxima = 0
     profundidades: dict[EstadoT, int] = {}
+    registro = RegistroNodos()
     mejor_plan: tuple[Hashable, ...] = ()
     mejor_costo = 0.0
     mejor_profundidad = maxima
@@ -195,7 +286,14 @@ def backtracking(
         nonlocal expandidos, generados, maxima, mejor_plan, mejor_costo, mejor_profundidad
         expandidos += 1
         maxima = max(maxima, profundidad)
-        if problema.es_meta(estado):
+        es_meta = problema.es_meta(estado)
+        id_actual = registro.registrar(
+            estado,
+            expandido=True,
+            es_meta=es_meta,
+            orden_expansion=expandidos,
+        )
+        if es_meta:
             mejor_plan, mejor_costo, mejor_profundidad = plan, costo, len(plan)
             return True
         if profundidad >= limite:
@@ -206,18 +304,29 @@ def backtracking(
             sucesor = problema.resultado(estado, accion)
             nueva_profundidad = profundidad + 1
             if profundidades.get(sucesor, math.inf) <= nueva_profundidad:
+                registro.registrar(
+                    sucesor,
+                    padre_id=id_actual,
+                    accion=str(accion),
+                    profundidad=nueva_profundidad,
+                    descartado=True,
+                )
                 continue
-            if visitar(
+            nuevo_costo = round(costo + problema.costo_paso(estado, accion), 2)
+            registro.registrar(
                 sucesor,
-                (*plan, accion),
-                round(costo + problema.costo_paso(estado, accion), 2),
-                nueva_profundidad,
-            ):
+                padre_id=id_actual,
+                accion=str(accion),
+                profundidad=nueva_profundidad,
+                costo_g=nuevo_costo,
+            )
+            if visitar(sucesor, (*plan, accion), nuevo_costo, nueva_profundidad):
                 return True
         return False
 
     inicial = problema.estado_inicial()
     profundidades[inicial] = 0
+    registro.registrar(inicial)
     encontrado = visitar(inicial, (), 0.0, 0)
     return _resultado(
         "Backtracking",
@@ -229,6 +338,7 @@ def backtracking(
         generados,
         mejor_profundidad if encontrado else maxima,
         encontrado,
+        registro.nodos(),
     )
 
 
@@ -252,14 +362,24 @@ def costo_uniforme(problema: Problema[EstadoT, AccionT]) -> Resultado:
         (0.0, next(contador), inicial, (), 0)
     ]
     mejor: dict[EstadoT, float] = {inicial: 0.0}
+    registro = RegistroNodos()
+    registro.registrar(inicial)
     expandidos = generados = 0
 
     while frontera:
         costo, _, estado, plan, profundidad = heapq.heappop(frontera)
         if costo > mejor.get(estado, math.inf):
+            registro.registrar(estado, descartado=True)
             continue
         expandidos += 1
-        if problema.es_meta(estado):
+        es_meta = problema.es_meta(estado)
+        id_actual = registro.registrar(
+            estado,
+            expandido=True,
+            es_meta=es_meta,
+            orden_expansion=expandidos,
+        )
+        if es_meta:
             return _resultado(
                 "Costo uniforme",
                 problema,
@@ -270,17 +390,44 @@ def costo_uniforme(problema: Problema[EstadoT, AccionT]) -> Resultado:
                 generados,
                 len(plan),
                 True,
+                registro.nodos(),
             )
         for accion in problema.acciones(estado):
             generados += 1
             sucesor = problema.resultado(estado, accion)
             nuevo_costo = round(costo + problema.costo_paso(estado, accion), 2)
             if nuevo_costo >= mejor.get(sucesor, math.inf):
+                registro.registrar(
+                    sucesor,
+                    padre_id=id_actual,
+                    accion=str(accion),
+                    profundidad=profundidad + 1,
+                    costo_g=nuevo_costo,
+                    descartado=True,
+                )
                 continue
             mejor[sucesor] = nuevo_costo
+            registro.registrar(
+                sucesor,
+                padre_id=id_actual,
+                accion=str(accion),
+                profundidad=profundidad + 1,
+                costo_g=nuevo_costo,
+            )
             heapq.heappush(
                 frontera,
                 (nuevo_costo, next(contador), sucesor, (*plan, accion), profundidad + 1),
             )
 
-    return _resultado("Costo uniforme", problema, inicio, (), 0.0, expandidos, generados, 0, False)
+    return _resultado(
+        "Costo uniforme",
+        problema,
+        inicio,
+        (),
+        0.0,
+        expandidos,
+        generados,
+        0,
+        False,
+        registro.nodos(),
+    )

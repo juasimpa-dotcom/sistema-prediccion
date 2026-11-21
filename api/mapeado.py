@@ -12,6 +12,7 @@ import pandas as pd
 from api.esquemas import (
     CausaDTO,
     ComparativaDTO,
+    NodoBusquedaDTO,
     PlanDTO,
     PrediccionDTO,
     Proyeccion,
@@ -134,6 +135,25 @@ def plan_de(resultado: ResultadoSistema) -> PlanDTO:
         nodos_expandidos=plan.nodos_expandidos,
         restricciones=list(plan.restricciones),
         justificacion=plan.justificacion,
+        nodos_generados=plan.nodos_generados,
+        profundidad=plan.profundidad,
+        nodos=[
+            NodoBusquedaDTO(
+                id=nodo.id,
+                padre_id=nodo.padre_id,
+                estado=nodo.estado,
+                accion=nodo.accion,
+                profundidad=nodo.profundidad,
+                costo_bs=nodo.costo_g,
+                heuristica=nodo.heuristica_h,
+                f=nodo.f,
+                expandido=nodo.expandido,
+                es_meta=nodo.es_meta,
+                descartado=nodo.descartado,
+                orden_expansion=nodo.orden_expansion,
+            )
+            for nodo in plan.nodos
+        ],
     )
 
 

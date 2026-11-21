@@ -20,6 +20,7 @@ from expert_system.logica_difusa import ResultadoDifuso
 from expert_system.memoria_trabajo import MemoriaTrabajo
 from expert_system.motor_inferencia import TrazaInferencia
 from ml.predictor import PrediccionVentas
+from search.resultado import NodoBusqueda
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +90,9 @@ class PlanRecomendado:
         nodos_expandidos: Estados evaluados por la búsqueda.
         restricciones: Operadores excluidos por el diagnóstico.
         justificacion: Por qué el diagnóstico conduce a este plan.
+        nodos_generados: Estados creados durante la búsqueda.
+        profundidad: Cantidad de acciones del plan encontrado.
+        nodos: Estados visitados, con su relación padre-hijo y sus métricas.
     """
 
     acciones: tuple[str, ...]
@@ -97,6 +101,9 @@ class PlanRecomendado:
     nodos_expandidos: int
     restricciones: tuple[str, ...]
     justificacion: str
+    nodos_generados: int = 0
+    profundidad: int = 0
+    nodos: tuple[NodoBusqueda, ...] = ()
 
     @property
     def descripcion(self) -> str:
