@@ -14,13 +14,22 @@ Ejecutar:
 from __future__ import annotations
 
 import re
+import sys
+from pathlib import Path
 from typing import Any
 
 import httpx
 import plotly.graph_objects as go
 import streamlit as st
 
-from app.visualizacion import (
+# Streamlit antepone la carpeta del script al ``sys.path``. Añadir la raíz del
+# proyecto garantiza que ``app`` y ``config`` se resuelvan al arrancar desde
+# cualquier directorio (y evita colisiones con otros paquetes llamados ``app``).
+RAIZ_PROYECTO = str(Path(__file__).resolve().parent.parent)
+if RAIZ_PROYECTO not in sys.path:
+    sys.path.insert(0, RAIZ_PROYECTO)
+
+from app.visualizacion import (  # noqa: E402
     categoria_nodo,
     etiqueta,
     grafo_nodos,
@@ -30,7 +39,7 @@ from app.visualizacion import (
     resumen_nodos,
     ruta_solucion,
 )
-from config import DASHBOARD_API_URL, DASHBOARD_TIMEOUT_S
+from config import DASHBOARD_API_URL, DASHBOARD_TIMEOUT_S  # noqa: E402
 
 COLORES_SEMAFORO: dict[str, str] = {
     "verde": "#2e7d32",
