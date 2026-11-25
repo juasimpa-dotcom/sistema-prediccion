@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from api.main import crear_app
 from config import API_TITULO, API_VERSION
 from core.fabrica import construir_sistema
+from expert_system.base_conocimientos import BaseConocimientos
 
 PETICION_BASE: dict[str, object] = {
     "sucursal": "El Alto",
@@ -53,7 +54,14 @@ def test_openapi_en_espanol(cliente: TestClient) -> None:
     assert esquema["info"]["title"] == API_TITULO
     assert esquema["info"]["version"] == API_VERSION
     assert any(tag["name"] == "Análisis" for tag in esquema["tags"])
-    for ruta in ("/predecir", "/diagnosticar", "/planificar", "/analisis-completo"):
+    assert any(tag["name"] == "Conocimiento" for tag in esquema["tags"])
+    for ruta in (
+        "/predecir",
+        "/diagnosticar",
+        "/planificar",
+        "/analisis-completo",
+        "/reglas",
+    ):
         assert ruta in esquema["paths"]
 
 
@@ -141,6 +149,99 @@ def test_benchmark(cliente: TestClient) -> None:
     assert len(datos["filas"]) == 28
     assert "A*" in {fila["algoritmo"] for fila in datos["filas"]}
     assert set(datos["escenarios"]) == {"facil", "medio", "dificil", "sin_solucion"}
+
+
+def test_reglas(cliente: TestClient) -> None:
+    """``/reglas`` entrega el catálogo completo sin ejecutar inferencia."""
+    respuesta = cliente.get("/reglas")
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["expertas"] == 38
+    assert datos["difusas"] == 22
+    assert datos["total"] == 60 == datos["expertas"] + datos["difusas"]
+
+    por_id = {regla["id"]: regla for regla in datos["reglas"]}
+    assert len(por_id) == datos["total"]
+    campos = {
+        "tipo",
+        "id",
+        "descripcion",
+        "categoria",
+        "si",
+        "entonces",
+        "certeza",
+        "prioridad",
+        "antecedentes",
+        "consecuentes",
+    }
+    assert all(campos <= set(regla) for regla in datos["reglas"])
+
+    experta = por_id["D01"]
+    assert experta["tipo"] == "experta"
+    assert experta["certeza"] == 0.9
+    assert experta["prioridad"] == 80
+    assert "stock_cobertura" in experta["si"]
+    assert "stock_critico" in experta["entonces"]
+    assert experta["antecedentes"]
+
+    difusa = por_id["DF22"]
+    assert difusa["tipo"] == "difusa"
+    assert difusa["certeza"] is None
+    assert difusa["prioridad"] is None
+    assert len(difusa["antecedentes"]) == 2
+    assert difusa["consecuentes"]
+
+
+def test_base_reglas_inyectada() -> None:
+    """La base cacheada puede inyectarse al crear la aplicación."""
+    base = BaseConocimientos.desde_json()
+    aplicacion = crear_app(base_reglas=base)
+    assert aplicacion.state.base_reglas is base
+    with TestClient(aplicacion) as prueba:
+        respuesta = prueba.get("/reglas")
+    assert respuesta.status_code == 200
+    assert respuesta.json()["total"] == 60
+
+
+def test_reglas_aplicadas_en_las_respuestas(cliente: TestClient) -> None:
+    """Las respuestas incluyen las reglas reales con toda su información."""
+    analisis = analizar(cliente)
+    reglas = analisis["reglas_aplicadas"]
+    assert isinstance(reglas, list) and reglas
+
+    campos = {
+        "orden",
+        "regla_id",
+        "descripcion",
+        "categoria",
+        "premisa",
+        "cf_premisa",
+        "fc_regla",
+        "cf_conclusion",
+        "conclusion",
+        "conclusion_atributo",
+        "conclusion_valor",
+        "momento",
+        "prioridad",
+        "tipo",
+    }
+    assert all(campos <= set(regla) for regla in reglas)
+    assert all(regla["premisa"] and regla["conclusion"] for regla in reglas)
+
+    expertas = [regla for regla in reglas if regla["tipo"] == "experta"]
+    difusas = [regla for regla in reglas if regla["tipo"] == "difusa"]
+    assert expertas and difusas
+    assert [regla["orden"] for regla in expertas] == list(range(1, len(expertas) + 1))
+    assert any(regla["prioridad"] is not None for regla in expertas)
+    assert all(regla["prioridad"] is None for regla in difusas)
+    assert all(regla["fc_regla"] > 0 for regla in difusas)
+    assert set(analisis["reglas_disparadas"]) <= {regla["regla_id"] for regla in expertas}
+
+    diagnostico = analizar(cliente, "/diagnosticar")
+    assert len(diagnostico["reglas_aplicadas"]) == len(reglas)
+
+    explicacion = cliente.get(f"/explicar/{analisis['id']}").json()
+    assert explicacion["reglas_aplicadas"] == reglas
 
 
 def test_cors(cliente: TestClient) -> None:

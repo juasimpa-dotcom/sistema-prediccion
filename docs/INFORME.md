@@ -21,7 +21,14 @@ diciendo **qué hacer**. En la primera pantalla aparecen, en este orden:
    riesgo.
 3. **Una frase de lectura rápida** que conecta esas cifras con la decisión.
 4. **Tres apartados cerrados** con el detalle: por qué se decidió eso, cómo se
-   exploraron las opciones y comparación técnica.
+   exploraron las opciones y comparación técnica. Este último tiene tres
+   pestañas: comparación de algoritmos, reglas aplicadas y catálogo completo.
+
+Dentro del apartado técnico la comparación no se limita a barras: dice con
+palabras qué algoritmo entrega el plan más barato, cuál es el más rápido y cuáles
+no llegan a la meta. Las reglas se muestran con código, nombre legible,
+condición SI, conclusión ENTONCES, certeza y prioridad; en las difusas, la
+certeza es la fuerza real con la que se activaron.
 
 La lógica de negocio no cambió. El modelo de Machine Learning, las reglas del
 experto, la lógica difusa y los algoritmos de búsqueda siguen siendo los mismos.
@@ -60,7 +67,8 @@ externo.
 2. Mira la **inversión estimada** y compárala con tu presupuesto.
 3. Mira la frase de contexto: te dice si el problema es de stock, merma,
    afluencia o precio.
-4. Solo si quieres profundizar, abre los tres apartados de abajo.
+4. Solo si quieres profundizar, abre los tres apartados de abajo; en el último,
+   cambia entre sus tres pestañas según lo que necesites.
 
 ---
 
@@ -105,6 +113,15 @@ ejemplo.
 Si subes o bajas la meta o el presupuesto, vuelve a pulsar **«Calcular plan»**.
 El sistema recalcula y avisa si ya no existe un plan dentro del presupuesto.
 
+### Cómo responder preguntas concretas
+
+| Pregunta | Dónde mirar |
+| -------- | ----------- |
+| ¿Qué algoritmo da el mejor plan? | **«Comparación y detalle técnico» → «Comparación de algoritmos»**. |
+| ¿Qué reglas se usaron en este caso? | Pestaña **«Reglas aplicadas»**. |
+| ¿Qué reglas existen en el sistema? | Pestaña **«Todas las reglas del sistema»**. |
+| ¿Por qué hay riesgo alto? | **«¿Por qué esta decisión?»**: causa en palabras, certeza y palanca. |
+
 ---
 
 ## 4. Guion de exposición (5 minutos)
@@ -113,14 +130,15 @@ El sistema recalcula y avisa si ya no existe un plan dentro del presupuesto.
 | ------ | ------- | ----- |
 | 0:00 – 0:30 | Solo la parte superior del dashboard. | *"En menos de 30 segundos: reponer 400 unidades de pollo, cuesta 4 400 bolivianos y el riesgo es alto. Eso es lo que se hace esta semana."* |
 | 0:30 – 1:15 | Las cuatro cifras y la frase de contexto. | *"La proyección es de 35 740 bolivianos, apenas 67 % de la meta. El diagnóstico apunta a operación crítica y merma alta: hay producto, pero no llega o se pierde antes de venderse."* |
-| 1:15 – 2:15 | Abrir **«¿Por qué esta decisión?»**. | *"El modelo estima la cifra y SHAP muestra qué variables la empujan. Las reglas del experto convierten eso en causas, la lógica difusa gradúa el riesgo y el plan se elige por menor costo entre las opciones permitidas."* |
+| 1:15 – 2:15 | Abrir **«¿Por qué esta decisión?»**. | *"Cada causa aparece en palabras, con certeza alta, media o baja y qué acción permite o bloquea. Detrás están SHAP, las reglas y la lógica difusa, pero no hacen falta para entender el motivo."* |
 | 2:15 – 3:15 | Abrir **«Cómo se exploraron las opciones»**. | *"Esto no es una ilustración: son los 56 estados reales que creó la búsqueda. 29 se evaluaron, 18 se descartaron y solo 2 están en la ruta ganadora. La línea dorada es el camino a la meta; la línea de tiempo respeta el orden exacto de evaluación."* |
-| 3:15 – 4:15 | Abrir **«Comparación y detalle técnico»**. | *"Aquí queda la evidencia para quien la pida: reglas disparadas, comparación de algoritmos y aporte de cada enfoque. No hace falta verlo para decidir, pero está disponible y es auditable."* |
+| 3:15 – 4:15 | Abrir **«Comparación y detalle técnico»** y recorrer sus tres pestañas. | *"La primera pestaña dice con palabras quién da el plan más barato, quién es más rápido y quién no llega a la meta; las barras solo acompañan. La segunda muestra las reglas que realmente se aplicaron, con su SI, su ENTONCES y su certeza. La tercera contiene el catálogo completo de las 60 reglas del sistema."* |
 | 4:15 – 5:00 | Cerrar los expanders y volver a la decisión. | *"La acción de esta semana es reponer stock. Si cambia el presupuesto o la meta, el sistema vuelve a calcular y nos dice si el plan sigue siendo viable."* |
 
-**Consejo para mañana:** deja los tres apartados cerrados al empezar. Ábrelos
-solo cuando alguien pregunte «¿por qué?». Eso mantiene la atención en la
-decisión y evita que la audiencia se pierda en términos técnicos.
+**Consejo para mañana:** deja los tres apartados cerrados al empezar. Si
+preguntan por algoritmos o reglas, abre el último apartado y usa sus pestañas en
+ese orden: comparación, reglas aplicadas y catálogo. Eso mantiene la atención en
+la decisión y evita que la audiencia se pierda en términos técnicos.
 
 ---
 
@@ -140,6 +158,21 @@ simbólico: cuanto menor es, más cautelosas son las reglas.
 A* comparó las opciones permitidas y eligió la de menor costo que alcanza la
 meta dentro del presupuesto. La ruta y el orden de evaluación se muestran en la
 traza real, no en un dibujo decorativo.
+
+**¿Cómo sé qué algoritmo conviene más?**
+La pestaña «Comparación de algoritmos» lo dice en texto: cuál logra el menor
+costo, cuál resuelve más rápido y cuáles no alcanzan la meta. La tabla y el
+gráfico son la prueba, no la explicación principal.
+
+**¿Dónde veo las reglas que se aplicaron?**
+En la pestaña «Reglas aplicadas». Cada fila trae el orden real de disparo, el
+código, el nombre legible, la condición SI, la conclusión ENTONCES, la certeza y
+la prioridad. Las reglas difusas muestran su fuerza de activación.
+
+**¿Puedo ver todas las reglas del sistema?**
+Sí: la pestaña «Todas las reglas del sistema» muestra las 60 reglas (38 expertas
+y 22 difusas) con condición y conclusión en español. También se consultan con
+`GET /reglas` sin ejecutar ningún análisis.
 
 **¿Por qué no propone una promoción?**
 Porque el diagnóstico dice que el problema es operativo (stock y merma). Las
@@ -174,22 +207,36 @@ plan → `api/esquemas.py` y `api/mapeado.py` lo entregan por REST →
 `app/visualizacion.py` dibuja el grafo y la línea de tiempo → `app/dashboard.py`
 los muestra dentro del apartado **«Cómo se exploraron las opciones»**.
 
+**Trazabilidad de las reglas.**
+`expert_system/reglas.json` y `config.py` declaran las reglas →
+`MotorInferencia` registra cada disparo real con orden, premisa y certezas →
+`core/resultado.py` guarda `reglas_aplicadas` → `api/mapeado.py` proyecta la
+traza y el catálogo → `GET /reglas` expone las 60 reglas y el dashboard las
+muestra en sus pestañas.
+
 **Endpoints usados por el dashboard.**
 
 | Método | Ruta | Para qué sirve |
 | ------ | ---- | -------------- |
-| POST | `/analisis-completo` | Predicción, causas, riesgo, plan y traza |
+| POST | `/analisis-completo` | Predicción, causas, riesgo, plan, traza y reglas aplicadas |
 | GET | `/explicar/{id}` | Explicación detallada y factores SHAP |
 | GET | `/benchmark` | Comparación de algoritmos de búsqueda |
+| GET | `/reglas` | Catálogo completo de reglas expertas y difusas (solo lectura) |
 
-**Verificación de esta entrega.** 272 pruebas en verde; `black --check` y
-`ruff check` sin hallazgos; arranque real de API y dashboard comprobado.
+**Verificación de esta entrega.** 279 pruebas en verde; `black --check` y
+`ruff check` sin hallazgos; arranque real de API y dashboard comprobado, con las
+tres pestañas visibles, tablas accesibles y sin errores en consola.
 
-**Archivos tocados.** `app/dashboard.py` (rediseño de la pantalla), este informe
-y el renombrado de `docs/informe.md` a `docs/INFORME_TECNICO.md` para liberar el
-nombre `docs/INFORME.md` sin perder el informe académico. Las referencias en
-`README.md`, `docs/guion_demo.md`, `docs/commonkads.md`, `prompt_maestro.md` y
-`setup_proyecto.py` se actualizaron al nuevo nombre.
+**Archivos tocados.** `app/dashboard.py` (rediseño y pestañas),
+`app/visualizacion.py` (traducción de reglas, certezas y causas en palabras),
+`api/esquemas.py`, `api/mapeado.py`, `api/dependencias.py` y `api/main.py`
+(catálogo `GET /reglas` y traza completa), `core/resultado.py`, `core/sistema.py`
+y `expert_system/motor_inferencia.py` (propagación de la traza real), las
+pruebas correspondientes, este informe y el renombrado de `docs/informe.md` a
+`docs/INFORME_TECNICO.md` para liberar el nombre `docs/INFORME.md` sin perder el
+informe académico. Las referencias en `README.md`, `docs/guion_demo.md`,
+`docs/commonkads.md`, `prompt_maestro.md` y `setup_proyecto.py` se actualizaron
+al nuevo nombre.
 
 ---
 

@@ -31,13 +31,18 @@ if RAIZ_PROYECTO not in sys.path:
 
 from app.visualizacion import (  # noqa: E402
     categoria_nodo,
+    certeza_en_palabras,
     etiqueta,
+    explicacion_causa,
     grafo_nodos,
     id_regla,
     linea_tiempo_nodos,
+    palanca_causa,
     primera_frase,
+    resumen_benchmark,
     resumen_nodos,
     ruta_solucion,
+    traducir_expresion,
 )
 from config import DASHBOARD_API_URL, DASHBOARD_TIMEOUT_S  # noqa: E402
 
@@ -116,6 +121,17 @@ def cargar_benchmark(cliente: httpx.Client) -> dict[str, Any] | None:
     return st.session_state["benchmark"]
 
 
+def cargar_reglas(cliente: httpx.Client) -> dict[str, Any] | None:
+    """Obtiene y cachea el catálogo completo de reglas del sistema."""
+    if "reglas_sistema" not in st.session_state:
+        try:
+            st.session_state["reglas_sistema"] = obtener_json(cliente, "/reglas")
+        except Exception as exc:
+            st.warning(f"No se pudo cargar el catálogo de reglas: {mensaje_error(exc)}")
+            return None
+    return st.session_state["reglas_sistema"]
+
+
 def grafico_historico(analisis: dict[str, Any]) -> go.Figure:
     """Dibuja las ventas observadas, la meta y la proyección de la semana t+1."""
     historial = analisis["historial"]
@@ -161,30 +177,6 @@ def grafico_historico(analisis: dict[str, Any]) -> go.Figure:
         hovermode="x unified",
         height=420,
         margin={"l": 40, "r": 20, "t": 60, "b": 80},
-    )
-    return figura
-
-
-def grafico_causas(causas: list[dict[str, Any]]) -> go.Figure:
-    """Dibuja una barra horizontal por causa, con su certeza absoluta."""
-    ordenadas = sorted(causas, key=lambda causa: abs(causa["cf"]))
-    figura = go.Figure(
-        go.Bar(
-            x=[abs(causa["cf"]) for causa in ordenadas],
-            y=[etiqueta(causa["causa"]) for causa in ordenadas],
-            orientation="h",
-            marker={"color": "#5e35b1"},
-            text=[f"{causa['cf']:+.3f}" for causa in ordenadas],
-            textposition="auto",
-            hovertext=[causa["descripcion"] for causa in ordenadas],
-        )
-    )
-    figura.update_layout(
-        title="Causas diagnosticadas",
-        xaxis_title="Certeza (valor absoluto)",
-        yaxis_title="Causa",
-        height=max(220, 70 * len(ordenadas)),
-        margin={"l": 40, "r": 20, "t": 60, "b": 40},
     )
     return figura
 
@@ -250,13 +242,39 @@ def grafico_benchmark(filas: list[dict[str, Any]]) -> go.Figure:
         )
     )
     figura.update_layout(
-        title="Estados evaluados por algoritmo",
+        title="Apoyo: esfuerzo de búsqueda por algoritmo",
         xaxis_title="Estados evaluados",
         yaxis_title="Algoritmo",
         height=max(260, 45 * len(ordenadas)),
         margin={"l": 40, "r": 60, "t": 60, "b": 40},
     )
     return figura
+
+
+def tabla_comparacion(
+    filas: list[dict[str, Any]],
+    resumen: dict[str, Any],
+) -> list[dict[str, str]]:
+    """Prepara la tabla legible con etiquetas para mejor plan, rapidez y fallo."""
+    tabla: list[dict[str, str]] = []
+    for fila in filas:
+        marcas: list[str] = []
+        if fila["encontrado"] and fila["algoritmo"] in resumen["mejores_ids"]:
+            marcas.append("✅ Mejor plan")
+        if fila["encontrado"] and fila["algoritmo"] == resumen["rapido_id"]:
+            marcas.append("⚡ Más rápido")
+        if not fila["encontrado"]:
+            marcas.append("⛔ No llega")
+        tabla.append(
+            {
+                "Algoritmo": etiqueta(fila["algoritmo"]),
+                "Resultado": ", ".join(marcas) or "Llega a la meta",
+                "Costo (Bs)": f"{float(fila['costo']):,.0f}" if fila["encontrado"] else "—",
+                "Tiempo (s)": f"{float(fila['tiempo']):.4f}",
+                "Estados evaluados": f"{fila['nodos_expandidos']:,}",
+            }
+        )
+    return tabla
 
 
 def mostrar_decision(analisis: dict[str, Any]) -> None:
@@ -311,7 +329,7 @@ def mostrar_numeros(analisis: dict[str, Any]) -> None:
 
 
 def mostrar_por_que(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
-    """Detalle técnico de la predicción, el diagnóstico y el plan, bajo demanda."""
+    """Explica la decisión con causas, certeza en palabras y palancas, bajo demanda."""
     with st.expander(
         "¿Por qué esta decisión?",
         icon=":material/lightbulb:",
@@ -321,42 +339,40 @@ def mostrar_por_que(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
         if not caja.open:
             return
 
-        st.markdown("**Diagnóstico**")
+        st.markdown("**Qué llevó a esta decisión**")
         causas = analisis["causas"]
+        restricciones = set(analisis["plan"].get("restricciones", []))
         if not causas:
-            st.info("No se diagnosticaron causas con certeza positiva.")
-        else:
-            st.plotly_chart(
-                grafico_causas(causas),
-                width="stretch",
-                alt="Causas detectadas y nivel de certeza de cada una.",
+            st.info(
+                "No se diagnosticaron causas con certeza positiva. "
+                "La decisión se tomó solo con la proyección y el presupuesto."
             )
-            st.dataframe(
-                [
-                    {
-                        "Causa": etiqueta(causa["causa"]),
-                        "Certeza": f"{causa['cf']:+.3f}",
-                        "Evidencia": primera_frase(causa["descripcion"]),
-                        "Reglas aplicadas": ", ".join(
-                            id_regla(regla)[0] or primera_frase(id_regla(regla)[1])
-                            for regla in causa["reglas"]
-                        )
-                        or "hecho del contexto",
-                    }
-                    for causa in causas
-                ],
-                width="stretch",
-                hide_index=True,
+        else:
+            for numero, causa in enumerate(causas, start=1):
+                with st.container(border=True):
+                    st.markdown(f"**{numero}. {etiqueta(causa['causa'])}**")
+                    st.write(
+                        f"Certeza: **{certeza_en_palabras(causa['cf'])}**. "
+                        f"{explicacion_causa(causa['causa'])}"
+                    )
+                    st.caption(palanca_causa(causa["causa"], restricciones))
+                    respaldos = ", ".join(
+                        id_regla(regla)[0] or primera_frase(id_regla(regla)[1])
+                        for regla in causa["reglas"]
+                    )
+                    if respaldos:
+                        st.caption(f"Reglas que la respaldan: {respaldos}")
+            st.caption(
+                "La certeza se dice en palabras: alta, media o baja. "
+                "El valor numérico y las reglas completas están en «Comparación y detalle técnico»."
             )
 
         riesgo = analisis["riesgo"]
         st.markdown("**Nivel de riesgo**")
+        activadas = ", ".join(etiqueta(regla) for regla in riesgo["reglas_activadas"]) or "ninguna"
         st.write(
-            f"El nivel difuso es {riesgo['valor']:.1f} con una certeza de {riesgo['grado']:.0%}; "
-            f"la urgencia es {etiqueta(riesgo['urgencia'])}."
-        )
-        st.caption(
-            "Reglas difusas activadas: " + (", ".join(riesgo["reglas_activadas"]) or "ninguna")
+            f"El riesgo es {etiqueta(riesgo['etiqueta'])} y la urgencia es "
+            f"{etiqueta(riesgo['urgencia'])}. Se activaron reglas difusas: {activadas}."
         )
         st.plotly_chart(
             grafico_historico(analisis),
@@ -467,6 +483,125 @@ def mostrar_exploracion_estados(plan: dict[str, Any]) -> None:
         )
 
 
+def mostrar_bloque_comparacion(filas: list[dict[str, Any]], con_grafico: bool) -> None:
+    """Muestra la conclusión, la tabla legible y el gráfico de apoyo."""
+    resumen = resumen_benchmark(filas)
+    if resumen["mejor_costo"] is None:
+        st.warning(resumen["frase"])
+    else:
+        st.markdown(f"**Conclusión:** {resumen['frase']}")
+    st.dataframe(
+        tabla_comparacion(filas, resumen),
+        width="stretch",
+        hide_index=True,
+        alt="Comparación de algoritmos con mejor plan, rapidez y llegada a la meta.",
+    )
+    if con_grafico:
+        st.caption(
+            "El gráfico es solo apoyo: muestra cuántos estados evaluó cada algoritmo. "
+            "La conclusión y la tabla son las que responden la pregunta."
+        )
+        st.plotly_chart(
+            grafico_benchmark(filas),
+            width="stretch",
+            alt="Apoyo visual del esfuerzo de búsqueda por algoritmo.",
+        )
+
+
+def mostrar_comparacion_algoritmos(cliente: httpx.Client) -> None:
+    """Resume cuál algoritmo conviene, cuál es rápido y cuál no llega a la meta."""
+    benchmark = cargar_benchmark(cliente)
+    if benchmark is None:
+        return
+
+    escenarios = {etiqueta(nombre): nombre for nombre in benchmark["escenarios"]}
+    seleccion = st.selectbox("Escenario", ["Todos", *escenarios], key="escenario_benchmark")
+    if seleccion == "Todos":
+        st.caption("La conclusión se calcula por escenario para no mezclar metas distintas.")
+        for nombre, clave in escenarios.items():
+            filas = [fila for fila in benchmark["filas"] if fila["escenario"] == clave]
+            if not filas:
+                continue
+            st.markdown(f"**Escenario: {nombre}**")
+            mostrar_bloque_comparacion(filas, con_grafico=False)
+        return
+
+    filas = [fila for fila in benchmark["filas"] if fila["escenario"] == escenarios[seleccion]]
+    if filas:
+        mostrar_bloque_comparacion(filas, con_grafico=True)
+    else:
+        st.info("No hay datos de benchmark para este escenario.")
+
+
+def mostrar_reglas_aplicadas(analisis: dict[str, Any]) -> None:
+    """Muestra con todos sus campos las reglas que se aplicaron en este cálculo."""
+    reglas = analisis.get("reglas_aplicadas") or []
+    if not reglas:
+        st.info(
+            "Esta respuesta no incluye el detalle de reglas. "
+            "Vuelve a calcular el plan con la API actualizada."
+        )
+        return
+
+    st.caption(
+        "Las reglas expertas se dispararon en orden; las difusas se activaron al "
+        "calcular el riesgo. En ellas, la certeza es la fuerza con la que se activaron."
+    )
+    st.dataframe(
+        [
+            {
+                "Orden": str(regla["orden"]) if regla["orden"] is not None else "—",
+                "Origen": "Experta" if regla["tipo"] == "experta" else "Difusa",
+                "Código": regla["regla_id"],
+                "Nombre legible": primera_frase(etiqueta(regla["descripcion"])),
+                "SI": traducir_expresion(regla["premisa"]),
+                "ENTONCES": traducir_expresion(regla["conclusion"]),
+                "Certeza": (f"{certeza_en_palabras(regla['fc_regla'])} ({regla['fc_regla']:.2f})"),
+                "Prioridad": (str(regla["prioridad"]) if regla["prioridad"] is not None else "—"),
+            }
+            for regla in reglas
+        ],
+        width="stretch",
+        hide_index=True,
+        alt="Reglas aplicadas con código, nombre, condición, conclusión, certeza y prioridad.",
+    )
+
+
+def mostrar_catalogo_reglas(cliente: httpx.Client) -> None:
+    """Muestra todas las reglas declaradas por la API, en español."""
+    catalogo = cargar_reglas(cliente)
+    if catalogo is None:
+        return
+
+    st.caption(
+        f"El sistema declara {catalogo['expertas']} reglas expertas y "
+        f"{catalogo['difusas']} reglas difusas. Esta lista es informativa: "
+        "no se ejecuta ninguna regla al consultarla."
+    )
+    st.dataframe(
+        [
+            {
+                "Tipo": "Experta" if regla["tipo"] == "experta" else "Difusa",
+                "Código": regla["id"],
+                "Nombre legible": primera_frase(etiqueta(regla["descripcion"])),
+                "Categoría": etiqueta(regla["categoria"]),
+                "SI": traducir_expresion(regla["si"]),
+                "ENTONCES": traducir_expresion(regla["entonces"]),
+                "Certeza": (
+                    f"{certeza_en_palabras(regla['certeza'])} ({regla['certeza']:.2f})"
+                    if regla["certeza"] is not None
+                    else "según pertenencia difusa"
+                ),
+                "Prioridad": (str(regla["prioridad"]) if regla["prioridad"] is not None else "—"),
+            }
+            for regla in catalogo["reglas"]
+        ],
+        width="stretch",
+        hide_index=True,
+        alt="Catálogo completo de reglas expertas y difusas del sistema.",
+    )
+
+
 def mostrar_detalle_tecnico(cliente: httpx.Client, analisis: dict[str, Any]) -> None:
     """Comparativa de algoritmos, reglas y enfoques de IA, bajo demanda."""
     with st.expander(
@@ -478,63 +613,21 @@ def mostrar_detalle_tecnico(cliente: httpx.Client, analisis: dict[str, Any]) -> 
         if not caja.open:
             return
 
-        st.markdown("**Comparación de algoritmos**")
-        benchmark = cargar_benchmark(cliente)
-        if benchmark is not None:
-            escenarios = {etiqueta(nombre): nombre for nombre in benchmark["escenarios"]}
-            opciones = ["Todos", *escenarios]
-            seleccion = st.selectbox("Escenario", opciones, key="escenario_benchmark")
-            filas = (
-                benchmark["filas"]
-                if seleccion == "Todos"
-                else [
-                    fila
-                    for fila in benchmark["filas"]
-                    if fila["escenario"] == escenarios[seleccion]
-                ]
-            )
-            if filas:
-                st.plotly_chart(
-                    grafico_benchmark(filas),
-                    width="stretch",
-                    alt="Estados evaluados por cada algoritmo en los escenarios de prueba.",
-                )
-                st.dataframe(
-                    [
-                        {
-                            "Algoritmo": etiqueta(fila["algoritmo"]),
-                            "Escenario": etiqueta(fila["escenario"]).capitalize(),
-                            "Llegó a la meta": "sí" if fila["encontrado"] else "no",
-                            "Costo (Bs)": fila["costo"],
-                            "Estados evaluados": fila["nodos_expandidos"],
-                            "Estados creados": fila["nodos_generados"],
-                            "Tiempo (s)": fila["tiempo"],
-                        }
-                        for fila in filas
-                    ],
-                    width="stretch",
-                    hide_index=True,
-                )
+        pestañas = st.tabs(
+            [
+                "Comparación de algoritmos",
+                "Reglas aplicadas",
+                "Todas las reglas del sistema",
+            ]
+        )
+        with pestañas[0]:
+            mostrar_comparacion_algoritmos(cliente)
+        with pestañas[1]:
+            mostrar_reglas_aplicadas(analisis)
+        with pestañas[2]:
+            mostrar_catalogo_reglas(cliente)
 
-        st.markdown("**Reglas aplicadas**")
-        reglas = analisis["reglas_disparadas"]
-        if reglas:
-            for numero, regla in enumerate(reglas, start=1):
-                identificador, descripcion = id_regla(regla)
-                titulo = (
-                    f"**{identificador}** · {primera_frase(descripcion)}"
-                    if identificador
-                    else primera_frase(descripcion)
-                )
-                st.markdown(f"{numero:02d}. {titulo}")
-            st.caption("Texto original de las reglas:")
-            st.code(
-                "\n".join(f"{numero:02d}. {regla}" for numero, regla in enumerate(reglas, 1)),
-                language="text",
-            )
-        else:
-            st.info("El motor no aplicó reglas en esta ejecución.")
-
+        st.divider()
         st.markdown("**Machine Learning y experto difuso**")
         comparativa = analisis["comparativa"]
         columnas = st.columns(2)

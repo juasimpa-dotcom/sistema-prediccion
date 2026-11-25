@@ -23,6 +23,7 @@ from core.contexto import ContextoNegocio, contexto_desde_dataframe
 from core.fabrica import construir_contexto_desde_csv
 from core.resultado import ResultadoSistema
 from core.sistema import SistemaInteligente
+from expert_system.base_conocimientos import BaseConocimientos
 
 FabricaSistema: TypeAlias = Callable[[], SistemaInteligente]
 """Fábrica que devuelve una fachada nueva por petición."""
@@ -126,6 +127,11 @@ def obtener_servicio(request: Request) -> ServicioAnalisis:
 def obtener_repositorio(request: Request) -> RepositorioResultados:
     """Dependencia que expone el repositorio configurado en la aplicación."""
     return cast(RepositorioResultados, request.app.state.repositorio)
+
+
+def obtener_base_reglas(request: Request) -> BaseConocimientos:
+    """Dependencia que expone la base declarativa cacheada en la aplicación."""
+    return cast(BaseConocimientos, request.app.state.base_reglas)
 
 
 def estado_artefactos(request: Request) -> dict[str, bool]:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Sequence
 from typing import Any
 
 import plotly.graph_objects as go
@@ -24,6 +25,7 @@ ETIQUETAS: dict[str, str] = {
     "stock_cobertura": "Cobertura de stock",
     "stock_inicial": "Stock inicial",
     "nivel_stock": "Nivel de stock",
+    "ventas_caida_pct": "Caída de ventas (%)",
     "merma_pct": "Merma",
     "merma": "Merma",
     "temperatura_media": "Temperatura promedio",
@@ -32,6 +34,13 @@ ETIQUETAS: dict[str, str] = {
     "afluencia_clientes": "Afluencia de clientes",
     "precio_vs_competencia": "Precio frente a la competencia",
     "descuento_pct": "Descuento",
+    "es_perecible": "Producto perecible",
+    "es_feriado": "Semana con feriado",
+    "es_feriado_semana": "Semana con feriado",
+    "en_promocion": "En promoción",
+    "temporada": "Temporada",
+    "hay_excedente_en_otra_sucursal": "Excedente en otra sucursal",
+    "reabastecimiento_tardia": "Reposición tardía",
     "personal_rel": "Personal disponible",
     "personal_asignado": "Personal asignado",
     "fecha_semana": "Semana",
@@ -78,6 +87,23 @@ ETIQUETAS: dict[str, str] = {
     # Restricciones del planificador.
     "permitir_reasignacion": "reasignación de inventario",
     "permitir_reducir_merma": "reducción de merma",
+    # Variables lingüísticas y categorías de reglas.
+    "cumplimiento_esperado": "Cumplimiento esperado",
+    "intensidad_promocion": "Intensidad de la promoción",
+    "nivel_riesgo_incumplimiento": "Nivel de riesgo de incumplimiento",
+    "diagnostico": "diagnóstico",
+    "recomendacion": "recomendación",
+    "difuso": "difusa",
+    "puente_difuso": "puente difuso",
+    "experta": "experta",
+    "difusa": "difusa",
+    "adecuado": "adecuado",
+    "excesivo": "excesivo",
+    "normal": "normal",
+    "moderada": "moderada",
+    "fuerte": "fuerte",
+    "sí": "sí",
+    "no": "no",
     # Algoritmos y escenarios del benchmark.
     "BFS": "Amplitud (BFS)",
     "DFS": "Profundidad (DFS)",
@@ -100,11 +126,21 @@ ACCIONES: dict[str, str] = {
     "promocion": "Promoción",
     "mantener_plan": "Mantener plan",
     "sin_acciones": "Sin acciones",
+    "reponer_stock_urgente": "Reponer stock urgente",
+    "reducir_pedido_perecible": "Reducir pedido de producto perecible",
+    "ajustar_precio": "Ajustar precio",
 }
 
 PATRON_ACCION = re.compile(r"^(?P<nombre>[a-z_]+)\((?P<detalle>[^)]*)\)$")
 PATRON_CAMPO = re.compile(r"^(?P<variable>[a-zA-Z_]+)=(?P<valor>.+)$")
 PATRON_VARIABLE_SHAP = re.compile(r"^(?P<tipo>num|cat)__(?P<nombre>.+)$")
+PATRON_IDENTIFICADOR = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+OPERADORES_TEXTO: tuple[tuple[str, str], ...] = (
+    (">=", " es al menos "),
+    ("<=", " es como máximo "),
+    (">", " es mayor que "),
+    ("<", " es menor que "),
+)
 
 COLORES_NODO: dict[str, str] = {
     "meta": "#2e7d32",
@@ -122,6 +158,8 @@ def etiqueta(valor: object) -> str:
         return "—"
     if texto in ETIQUETAS:
         return ETIQUETAS[texto]
+    if texto in ACCIONES:
+        return ACCIONES[texto]
 
     coincidencia_campo = PATRON_CAMPO.match(texto)
     if coincidencia_campo:
@@ -161,6 +199,150 @@ def id_regla(texto: str) -> tuple[str, str]:
     if coincidencia is None:
         return "", etiqueta(texto)
     return coincidencia.group("id"), etiqueta(coincidencia.group("resto"))
+
+
+def certeza_en_palabras(valor: float) -> str:
+    """Traduce un factor de certeza a alta, media o baja."""
+    if valor >= 0.75:
+        return "alta"
+    if valor >= 0.45:
+        return "media"
+    return "baja"
+
+
+def _capitalizar(texto: str) -> str:
+    """Pone en mayúscula la primera letra, aunque el texto empiece por paréntesis."""
+    for indice, caracter in enumerate(texto):
+        if caracter.isalpha():
+            return texto[:indice] + caracter.upper() + texto[indice + 1 :]
+    return texto
+
+
+def traducir_expresion(texto: str) -> str:
+    """Traduce una condición o conclusión de regla a lenguaje natural."""
+    resultado = texto.strip()
+    resultado = re.sub(r"\bes\s+True\b", "= sí", resultado, flags=re.IGNORECASE)
+    resultado = re.sub(r"\bes\s+False\b", "= no", resultado, flags=re.IGNORECASE)
+    for operador, nombre in OPERADORES_TEXTO:
+        resultado = resultado.replace(operador, nombre)
+    resultado = re.sub(r"\bno está en\b", "no está entre", resultado)
+    resultado = re.sub(r"\bestá en\b", "está entre", resultado)
+    resultado = re.sub(r"\bY\b", "y", resultado)
+    resultado = re.sub(r"\bO\b", "o", resultado)
+    resultado = re.sub(r"\s*=\s*", " = ", resultado)
+    resultado = PATRON_IDENTIFICADOR.sub(
+        lambda coincidencia: etiqueta(coincidencia.group(0)), resultado
+    )
+    resultado = re.sub(r"\s+", " ", resultado).strip()
+    return _capitalizar(resultado)
+
+
+EXPLICACION_CAUSAS: dict[str, str] = {
+    "stock_critico": "Queda poco stock para la demanda esperada: no alcanza a cubrir la semana.",
+    "operacion_critica": "Varias señales de la operación están en nivel crítico al mismo tiempo.",
+    "merma_alta": "Se pierde una parte alta del producto antes de poder venderlo.",
+    "baja_afluencia": "Entraron menos clientes de lo esperado en la sucursal.",
+    "competencia_precios": "Nuestro precio quedó por encima del precio de la competencia.",
+    "falta_promocion": "No hubo una promoción que incentive la compra esta semana.",
+    "exceso_stock": (
+        "Quedó más stock del que se podía vender; el dinero está inmovilizado en inventario."
+    ),
+    "estacionalidad": "La temporada del año reduce o aumenta la demanda de esta categoría.",
+}
+"""Explicación breve de cada causa para una audiencia sin conocimientos técnicos."""
+
+PALANCAS_CAUSA: dict[str, tuple[str, ...]] = {
+    "stock_critico": ("reponer_stock", "reasignar_inventario"),
+    "operacion_critica": ("reponer_stock", "reforzar_personal"),
+    "merma_alta": ("reducir_merma",),
+    "baja_afluencia": ("lanzar_promocion", "reforzar_personal"),
+    "competencia_precios": ("lanzar_promocion", "ajustar_precio"),
+    "falta_promocion": ("lanzar_promocion",),
+    "exceso_stock": ("reasignar_inventario",),
+    "estacionalidad": ("reforzar_personal", "reponer_stock"),
+}
+"""Palancas comerciales que cada causa habilita o descarta."""
+
+RESTRICCION_POR_PALANCA: dict[str, str] = {
+    "reasignar_inventario": "permitir_reasignacion",
+    "reducir_merma": "permitir_reducir_merma",
+}
+
+
+def explicacion_causa(causa: str) -> str:
+    """Devuelve qué significa una causa en lenguaje sencillo."""
+    return EXPLICACION_CAUSAS.get(
+        causa,
+        "El sistema detectó una señal que influye en la venta esperada.",
+    )
+
+
+def palanca_causa(causa: str, restricciones: Sequence[str]) -> str:
+    """Explica qué acción permite o bloquea una causa dado el diagnóstico."""
+    permitidas: list[str] = []
+    bloqueadas: list[str] = []
+    for palanca in PALANCAS_CAUSA.get(causa, ()):
+        nombre = etiqueta(palanca)
+        restriccion = RESTRICCION_POR_PALANCA.get(palanca)
+        if restriccion is not None and restriccion in restricciones:
+            bloqueadas.append(nombre)
+        else:
+            permitidas.append(nombre)
+    if permitidas and bloqueadas:
+        return f"Permite: {', '.join(permitidas)}. Bloquea: {', '.join(bloqueadas)}."
+    if permitidas:
+        return f"Permite: {', '.join(permitidas)}."
+    if bloqueadas:
+        return f"Bloquea: {', '.join(bloqueadas)}."
+    return "Aporta contexto, sin abrir ni cerrar una palanca concreta."
+
+
+def resumen_benchmark(filas: list[dict[str, Any]]) -> dict[str, Any]:
+    """Resume qué algoritmo da el mejor plan, cuál es rápido y cuál no llega."""
+    exitosas = [fila for fila in filas if fila.get("encontrado")]
+    sin_solucion = [fila for fila in filas if not fila.get("encontrado")]
+    nombres_sin = [etiqueta(fila["algoritmo"]) for fila in sin_solucion]
+
+    if not exitosas:
+        frase = (
+            "Ningún algoritmo llega a la meta en este escenario: "
+            "el presupuesto o las acciones disponibles no alcanzan."
+        )
+        if nombres_sin:
+            frase += f" No llegan: {', '.join(nombres_sin)}."
+        return {
+            "frase": frase,
+            "mejores_ids": (),
+            "mejor_costo": None,
+            "rapido_id": None,
+            "sin_solucion_ids": tuple(fila["algoritmo"] for fila in sin_solucion),
+        }
+
+    costo_minimo = min(float(fila["costo"]) for fila in exitosas)
+    mejores_ids = tuple(
+        fila["algoritmo"] for fila in exitosas if float(fila["costo"]) == costo_minimo
+    )
+    mejores = ", ".join(etiqueta(identificador) for identificador in mejores_ids)
+    verbo = "lo logran" if len(mejores_ids) > 1 else "lo logra"
+    rapida = min(exitosas, key=lambda fila: float(fila["tiempo"]))
+    nombre_rapido = etiqueta(rapida["algoritmo"])
+    frase = (
+        f"El plan más barato {verbo} {mejores} con Bs {costo_minimo:,.0f}. "
+        f"El más rápido entre quienes llegan es {nombre_rapido} "
+        f"({float(rapida['tiempo']):.4f} s)"
+    )
+    if float(rapida["costo"]) > costo_minimo:
+        frase += f", pero su plan cuesta Bs {float(rapida['costo']):,.0f}"
+    frase += "."
+    if nombres_sin:
+        frase += f" No llegan: {', '.join(nombres_sin)}."
+    return {
+        "frase": frase,
+        "mejores_ids": mejores_ids,
+        "mejor_costo": costo_minimo,
+        "rapido_id": rapida["algoritmo"],
+        "sin_solucion_ids": tuple(fila["algoritmo"] for fila in sin_solucion),
+    }
 
 
 def ruta_solucion(nodos: list[dict[str, Any]]) -> set[int]:

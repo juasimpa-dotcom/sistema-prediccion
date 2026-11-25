@@ -29,6 +29,7 @@ from api.dependencias import (
     ServicioAnalisis,
     contexto_desde_solicitud,
     estado_artefactos,
+    obtener_base_reglas,
     obtener_repositorio,
     obtener_servicio,
 )
@@ -41,10 +42,12 @@ from api.esquemas import (
     RespuestaExplicacion,
     RespuestaPlan,
     RespuestaPrediccion,
+    RespuestaReglas,
     RespuestaSalud,
     SolicitudAnalisis,
 )
 from api.mapeado import (
+    catalogo_reglas_de,
     causas_de,
     comparativa_de,
     fecha_objetivo_de,
@@ -52,6 +55,7 @@ from api.mapeado import (
     plan_de,
     prediccion_de,
     proyeccion_de,
+    reglas_aplicadas_de,
     riesgo_de,
 )
 from config import (
@@ -69,6 +73,7 @@ from config import (
     TEMPORADAS,
 )
 from core.fabrica import construir_sistema
+from expert_system.base_conocimientos import BaseConocimientos
 
 LOGGER = logging.getLogger(__name__)
 
@@ -86,6 +91,7 @@ TAGS = [
     {"name": "Explicaciones", "description": "Acceso a la explicación de un análisis guardado."},
     {"name": "Operación", "description": "Estado del servicio y catálogos del dominio."},
     {"name": "Datos de apoyo", "description": "Benchmark de algoritmos de búsqueda."},
+    {"name": "Conocimiento", "description": "Catálogo legible de reglas expertas y difusas."},
 ]
 
 
@@ -107,6 +113,7 @@ def crear_app(
     titulo: str = API_TITULO,
     version: str = API_VERSION,
     origenes_cors: Sequence[str] | None = None,
+    base_reglas: BaseConocimientos | None = None,
 ) -> FastAPI:
     """Construye la aplicación con dependencias explícitas y sin globales.
 
@@ -118,6 +125,8 @@ def crear_app(
         titulo: Título mostrado en OpenAPI.
         version: Versión mostrada en OpenAPI.
         origenes_cors: Orígenes permitidos; si se omiten se lee el entorno.
+        base_reglas: Base declarativa cacheada para ``GET /reglas``; si se omite
+            se carga desde ``ARCHIVO_REGLAS_EXPERTO``.
 
     Returns:
         Aplicación FastAPI lista para ``uvicorn`` o ``TestClient``.
@@ -151,6 +160,7 @@ def crear_app(
     app.state.servicio = servicio
     app.state.repositorio = servicio.repositorio
     app.state.rutas_artefactos = rutas
+    app.state.base_reglas = base_reglas or BaseConocimientos.desde_json(ARCHIVO_REGLAS_EXPERTO)
 
     app.add_middleware(
         CORSMiddleware,
@@ -321,6 +331,7 @@ def crear_app(
             causas=causas_de(resultado),
             riesgo=riesgo_de(resultado),
             reglas_disparadas=list(resultado.reglas_disparadas),
+            reglas_aplicadas=reglas_aplicadas_de(resultado),
         )
 
     @app.post(
@@ -384,6 +395,7 @@ def crear_app(
             explicacion=resultado.explicacion,
             comparativa=comparativa_de(resultado),
             reglas_disparadas=list(resultado.reglas_disparadas),
+            reglas_aplicadas=reglas_aplicadas_de(resultado),
         )
 
     @app.get(
@@ -417,6 +429,7 @@ def crear_app(
             riesgo=riesgo_de(resultado),
             plan=plan_de(resultado),
             reglas_disparadas=list(resultado.reglas_disparadas),
+            reglas_aplicadas=reglas_aplicadas_de(resultado),
             comparativa=comparativa_de(resultado),
         )
 
@@ -467,6 +480,23 @@ def crear_app(
             categorias=list(CATEGORIAS),
             temporadas=list(TEMPORADAS),
         )
+
+    @app.get(
+        "/reglas",
+        response_model=RespuestaReglas,
+        tags=["Conocimiento"],
+        summary="Obtener todas las reglas del sistema",
+        description=(
+            "Devuelve las reglas expertas y difusas declaradas, con código, "
+            "nombre, condición SI, conclusión ENTONCES, certeza y prioridad. "
+            "Es solo lectura: no ejecuta inferencia ni modifica el negocio."
+        ),
+    )
+    def reglas(
+        base: BaseConocimientos = Depends(obtener_base_reglas),
+    ) -> RespuestaReglas:
+        """Expone el catálogo cacheado de reglas para la pestaña informativa."""
+        return catalogo_reglas_de(base)
 
     @app.get(
         "/benchmark",

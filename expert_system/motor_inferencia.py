@@ -85,6 +85,7 @@ class PasoInferencia:
         conclusion_atributo: Variable concluida.
         conclusion_valor: Valor concluido.
         momento: Instante ISO 8601 del disparo.
+        prioridad: Prioridad declarada de la regla, para explicación.
     """
 
     orden: int
@@ -98,6 +99,7 @@ class PasoInferencia:
     conclusion_atributo: str
     conclusion_valor: Hashable
     momento: str
+    prioridad: int = 0
 
     @property
     def conclusion(self) -> str:
@@ -584,6 +586,7 @@ class MotorInferencia:
                 conclusion_atributo=regla.conclusion.atributo,
                 conclusion_valor=regla.conclusion.valor,
                 momento=_ahora(),
+                prioridad=regla.prioridad,
             )
         )
         return cf_conclusion

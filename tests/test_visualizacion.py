@@ -6,13 +6,18 @@ import plotly.graph_objects as go
 
 from api.esquemas import NodoBusquedaDTO, PlanDTO
 from app.visualizacion import (
+    certeza_en_palabras,
     etiqueta,
+    explicacion_causa,
     grafo_nodos,
     id_regla,
     linea_tiempo_nodos,
+    palanca_causa,
     primera_frase,
+    resumen_benchmark,
     resumen_nodos,
     ruta_solucion,
+    traducir_expresion,
 )
 from search.espacio_estados import ProblemaPlanComercial
 from search.informada import a_estrella
@@ -166,6 +171,87 @@ def test_resumen_y_ruta_de_nodos() -> None:
         "descartados": 1,
         "en_ruta": 2,
     }
+
+
+def test_certeza_en_palabras() -> None:
+    """La certeza se comunica sin números en la explicación principal."""
+    assert certeza_en_palabras(0.88) == "alta"
+    assert certeza_en_palabras(0.75) == "alta"
+    assert certeza_en_palabras(0.60) == "media"
+    assert certeza_en_palabras(0.45) == "media"
+    assert certeza_en_palabras(0.20) == "baja"
+    assert certeza_en_palabras(-0.80) == "baja"
+
+
+def test_traducir_expresion_de_reglas() -> None:
+    """Las condiciones y conclusiones se leen en español."""
+    assert (
+        traducir_expresion("(stock_cobertura < 0.35 Y ventas_caida_pct > 8)")
+        == "(Cobertura de stock es menor que 0.35 y Caída de ventas (%) es mayor que 8)"
+    )
+    assert (
+        traducir_expresion("causa_ventas_bajas=stock_critico")
+        == "Causa de la caída = stock crítico"
+    )
+    assert traducir_expresion("(urgencia_accion es alta)") == "(Urgencia de acción es alta)"
+    assert (
+        traducir_expresion("cumplimiento_esperado = bajo Y nivel_stock = excesivo")
+        == "Cumplimiento esperado = bajo y Nivel de stock = excesivo"
+    )
+
+
+def test_explicacion_y_palanca_de_causas() -> None:
+    """Cada causa dice qué significa y qué acción abre o cierra."""
+    assert "poco stock" in explicacion_causa("stock_critico")
+    assert explicacion_causa("causa_no_catalogada").startswith("El sistema detectó")
+
+    assert palanca_causa("merma_alta", ()) == "Permite: Reducir merma."
+    assert palanca_causa("merma_alta", ("permitir_reducir_merma",)) == "Bloquea: Reducir merma."
+    assert (
+        palanca_causa("exceso_stock", ("permitir_reasignacion",))
+        == "Bloquea: Reasignar inventario."
+    )
+    assert "Permite" in palanca_causa("competencia_precios", ())
+
+
+def test_resumen_benchmark_dice_quien_gana_y_quien_no_llega() -> None:
+    """El resumen responde la pregunta del usuario sin leer barras."""
+    filas = [
+        {
+            "algoritmo": "A*",
+            "escenario": "facil",
+            "encontrado": True,
+            "costo": 1400.0,
+            "tiempo": 0.0072,
+        },
+        {
+            "algoritmo": "Greedy",
+            "escenario": "facil",
+            "encontrado": True,
+            "costo": 1400.0,
+            "tiempo": 0.0004,
+        },
+        {
+            "algoritmo": "BFS",
+            "escenario": "facil",
+            "encontrado": False,
+            "costo": 0.0,
+            "tiempo": 0.5,
+        },
+    ]
+    resumen = resumen_benchmark(filas)
+    assert resumen["mejores_ids"] == ("A*", "Greedy")
+    assert resumen["mejor_costo"] == 1400.0
+    assert resumen["rapido_id"] == "Greedy"
+    assert resumen["sin_solucion_ids"] == ("BFS",)
+    assert "El plan más barato lo logran" in resumen["frase"]
+    assert "Voraz (Greedy)" in resumen["frase"]
+    assert "No llegan: Amplitud (BFS)" in resumen["frase"]
+
+    sin_plan = resumen_benchmark([filas[2]])
+    assert sin_plan["mejores_ids"] == ()
+    assert sin_plan["mejor_costo"] is None
+    assert "Ningún algoritmo llega a la meta" in sin_plan["frase"]
 
 
 def test_figuras_de_la_traza_son_plotly_y_usan_etiquetas() -> None:

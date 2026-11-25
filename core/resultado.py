@@ -9,7 +9,7 @@ ni dependencias externas en este módulo.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from config import (
     ATRIBUTO_CAUSA_VENTAS,
@@ -18,7 +18,7 @@ from config import (
 )
 from expert_system.logica_difusa import ResultadoDifuso
 from expert_system.memoria_trabajo import MemoriaTrabajo
-from expert_system.motor_inferencia import TrazaInferencia
+from expert_system.motor_inferencia import PasoInferencia, TrazaInferencia
 from ml.predictor import PrediccionVentas
 from search.resultado import NodoBusqueda
 
@@ -56,6 +56,7 @@ class RiesgoDifuso:
         urgencia: Etiqueta dominante de la urgencia de acción.
         reglas_activadas: Reglas difusas con fuerza positiva.
         descripcion: Resumen del resultado difuso.
+        fuerzas_reglas: Fuerza de activación real de cada regla difusa.
     """
 
     etiqueta: str
@@ -64,6 +65,7 @@ class RiesgoDifuso:
     urgencia: str
     reglas_activadas: tuple[str, ...]
     descripcion: str
+    fuerzas_reglas: dict[str, float] = field(default_factory=dict)
 
     @property
     def magnitud(self) -> str:
@@ -165,6 +167,7 @@ class ResultadoSistema:
         explicacion: Explicación unificada en español.
         comparativa: Comparativa simbólico vs. no simbólico (Tema 1).
         reglas_disparadas: Reglas crisp disparadas, en orden de ejecución.
+        reglas_aplicadas: Pasos completos de inferencia, con condición, certeza y prioridad.
     """
 
     sucursal: str
@@ -177,6 +180,7 @@ class ResultadoSistema:
     explicacion: str
     comparativa: ComparativaComponentes
     reglas_disparadas: tuple[str, ...]
+    reglas_aplicadas: tuple[PasoInferencia, ...] = ()
 
     @property
     def confianza(self) -> float:
@@ -237,6 +241,7 @@ def riesgo_desde_difuso(
             urgencia="desconocida",
             reglas_activadas=(),
             descripcion="No se ejecutó lógica difusa; solo hay evidencia crisp.",
+            fuerzas_reglas={},
         )
     etiqueta = resultado.etiquetas.get(variable_riesgo, "desconocida")
     return RiesgoDifuso(
@@ -246,6 +251,11 @@ def riesgo_desde_difuso(
         urgencia=resultado.etiquetas.get(variable_urgencia, "desconocida"),
         reglas_activadas=resultado.reglas_activadas,
         descripcion=resultado.descripcion(),
+        fuerzas_reglas={
+            identificador: round(fuerza, 4)
+            for identificador, fuerza in resultado.fuerzas.items()
+            if fuerza > 0.0
+        },
     )
 
 

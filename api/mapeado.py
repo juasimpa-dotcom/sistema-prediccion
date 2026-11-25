@@ -7,6 +7,8 @@ Este módulo solo las ordena, redondea y nombra para el contrato REST.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import pandas as pd
 
 from api.esquemas import (
@@ -17,11 +19,15 @@ from api.esquemas import (
     PrediccionDTO,
     Proyeccion,
     PuntoHistorico,
+    ReglaAplicadaDTO,
+    ReglaSistemaDTO,
+    RespuestaReglas,
     RiesgoDTO,
 )
-from config import RIESGO_SEMAFORO
+from config import REGLAS_DIFUSAS, RIESGO_SEMAFORO, ReglaDifusa
 from core.contexto import ContextoNegocio
 from core.resultado import ResultadoSistema, RiesgoDifuso
+from expert_system.base_conocimientos import BaseConocimientos, Condicion, GrupoCondiciones, Regla
 
 DIAS_POR_SEMANA = 7
 """Días que separa la semana cerrada ``t`` de la semana objetivo ``t + 1``."""
@@ -165,4 +171,115 @@ def comparativa_de(resultado: ResultadoSistema) -> ComparativaDTO:
         aporte_experto=comparativa.simbolico,
         complementariedad=comparativa.complementariedad,
         evidencia=comparativa.evidencia,
+    )
+
+
+def reglas_aplicadas_de(resultado: ResultadoSistema) -> list[ReglaAplicadaDTO]:
+    """Proyecta la traza real y las reglas difusas activadas en esta ejecución."""
+    crisp = [
+        ReglaAplicadaDTO(
+            orden=paso.orden,
+            regla_id=paso.regla_id,
+            descripcion=paso.descripcion,
+            categoria=paso.categoria,
+            premisa=paso.premisa,
+            cf_premisa=round(paso.cf_premisa, 4),
+            fc_regla=round(paso.fc_regla, 4),
+            cf_conclusion=round(paso.cf_conclusion, 4),
+            conclusion=paso.conclusion,
+            conclusion_atributo=paso.conclusion_atributo,
+            conclusion_valor=str(paso.conclusion_valor),
+            momento=paso.momento,
+            prioridad=paso.prioridad,
+            tipo="experta",
+        )
+        for paso in resultado.reglas_aplicadas
+    ]
+
+    por_id = {regla.id: regla for regla in REGLAS_DIFUSAS}
+    fuerzas = resultado.riesgo.fuerzas_reglas
+    difusas: list[ReglaAplicadaDTO] = []
+    for regla_id in resultado.riesgo.reglas_activadas:
+        regla = por_id.get(regla_id)
+        if regla is None:
+            continue
+        fuerza = round(fuerzas.get(regla_id, 0.0), 4)
+        antecedentes = _pares_linguisticos(regla.si)
+        consecuentes = _pares_linguisticos(regla.entonces)
+        difusas.append(
+            ReglaAplicadaDTO(
+                orden=None,
+                regla_id=regla.id,
+                descripcion=regla.descripcion,
+                categoria="difusa",
+                premisa=" Y ".join(antecedentes),
+                cf_premisa=fuerza,
+                fc_regla=fuerza,
+                cf_conclusion=fuerza,
+                conclusion=" Y ".join(consecuentes),
+                conclusion_atributo=", ".join(regla.entonces),
+                conclusion_valor=", ".join(regla.entonces.values()),
+                momento="",
+                prioridad=None,
+                tipo="difusa",
+            )
+        )
+    return crisp + difusas
+
+
+def _condiciones_atomicas(condicion: Condicion | GrupoCondiciones) -> list[str]:
+    """Aplana un grupo de condiciones conservando las atómicas en orden."""
+    if isinstance(condicion, GrupoCondiciones):
+        return [texto for hija in condicion.condiciones for texto in _condiciones_atomicas(hija)]
+    return [condicion.texto]
+
+
+def _pares_linguisticos(mapeo: Mapping[str, str]) -> list[str]:
+    """Convierte un mapping variable/etiqueta en pares legibles."""
+    return [f"{variable} = {etiqueta}" for variable, etiqueta in mapeo.items()]
+
+
+def _regla_sistema_de(regla: Regla) -> ReglaSistemaDTO:
+    """Proyecta una regla crisp con todos sus campos declarativos."""
+    return ReglaSistemaDTO(
+        tipo="experta",
+        id=regla.id,
+        descripcion=regla.descripcion,
+        categoria=regla.categoria,
+        si=regla.condiciones.texto,
+        entonces=regla.conclusion.texto,
+        certeza=round(regla.fc, 4),
+        prioridad=regla.prioridad,
+        antecedentes=_condiciones_atomicas(regla.condiciones),
+        consecuentes=[regla.conclusion.texto],
+    )
+
+
+def catalogo_reglas_de(
+    base: BaseConocimientos,
+    difusas: Sequence[ReglaDifusa] = REGLAS_DIFUSAS,
+) -> RespuestaReglas:
+    """Proyecta el catálogo completo sin ejecutar inferencia ni búsqueda."""
+    expertas = [_regla_sistema_de(regla) for regla in base.reglas]
+    reglas_difusas = [
+        ReglaSistemaDTO(
+            tipo="difusa",
+            id=regla.id,
+            descripcion=regla.descripcion,
+            categoria="difusa",
+            si=" Y ".join(_pares_linguisticos(regla.si)),
+            entonces=" Y ".join(_pares_linguisticos(regla.entonces)),
+            certeza=None,
+            prioridad=None,
+            antecedentes=_pares_linguisticos(regla.si),
+            consecuentes=_pares_linguisticos(regla.entonces),
+        )
+        for regla in difusas
+    ]
+    todas = expertas + reglas_difusas
+    return RespuestaReglas(
+        total=len(todas),
+        expertas=len(expertas),
+        difusas=len(reglas_difusas),
+        reglas=todas,
     )

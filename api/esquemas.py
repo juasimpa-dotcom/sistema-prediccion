@@ -169,6 +169,44 @@ class CausaDTO(BaseModel):
     reglas: list[str] = Field(description="Identificadores de reglas que concluyeron la causa")
 
 
+class ReglaAplicadaDTO(BaseModel):
+    """Regla realmente aplicada en una ejecución, con su información completa."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    orden: int | None = Field(description="Orden real de disparo; vacío en reglas difusas")
+    regla_id: str = Field(description="Código de la regla")
+    descripcion: str = Field(description="Nombre legible de la regla")
+    categoria: str = Field(description="Categoría declarada de la regla")
+    premisa: str = Field(description="Condición SI evaluada")
+    cf_premisa: float = Field(description="Certeza de la premisa antes de propagar")
+    fc_regla: float = Field(description="Certeza declarada o fuerza de activación de la regla")
+    cf_conclusion: float = Field(description="Certeza de la conclusión derivada")
+    conclusion: str = Field(description="Conclusión ENTONCES")
+    conclusion_atributo: str = Field(description="Variable o variables concluidas")
+    conclusion_valor: str = Field(description="Valor o valores concluidos")
+    momento: str = Field(description="Instante ISO 8601 del disparo, si aplica")
+    prioridad: int | None = Field(description="Prioridad declarada; vacío en reglas difusas")
+    tipo: Literal["experta", "difusa"] = Field(description="Origen de la regla")
+
+
+class ReglaSistemaDTO(BaseModel):
+    """Regla declarativa del catálogo, lista para mostrar en lenguaje natural."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tipo: Literal["experta", "difusa"] = Field(description="Origen de la regla")
+    id: str = Field(description="Código de la regla")
+    descripcion: str = Field(description="Nombre legible de la regla")
+    categoria: str = Field(description="Categoría declarada de la regla")
+    si: str = Field(description="Condición SI en el texto de la base")
+    entonces: str = Field(description="Conclusión ENTONCES en el texto de la base")
+    certeza: float | None = Field(description="FC declarado; vacío en reglas difusas")
+    prioridad: int | None = Field(description="Prioridad declarada; vacío en reglas difusas")
+    antecedentes: list[str] = Field(description="Condiciones atómicas o pares lingüísticos del SI")
+    consecuentes: list[str] = Field(description="Conclusiones atómicas o pares lingüísticos")
+
+
 class RiesgoDTO(BaseModel):
     """Riesgo difuso defuzzificado, con su semáforo visual."""
 
@@ -256,6 +294,7 @@ class RespuestaDiagnostico(RespuestaBase):
     causas: list[CausaDTO]
     riesgo: RiesgoDTO
     reglas_disparadas: list[str]
+    reglas_aplicadas: list[ReglaAplicadaDTO]
 
 
 class RespuestaPlan(RespuestaBase):
@@ -278,6 +317,7 @@ class RespuestaCompleta(RespuestaBase):
     explicacion: str
     comparativa: ComparativaDTO
     reglas_disparadas: list[str]
+    reglas_aplicadas: list[ReglaAplicadaDTO]
 
 
 class RespuestaExplicacion(BaseModel):
@@ -292,6 +332,7 @@ class RespuestaExplicacion(BaseModel):
     riesgo: RiesgoDTO
     plan: PlanDTO
     reglas_disparadas: list[str]
+    reglas_aplicadas: list[ReglaAplicadaDTO]
     comparativa: ComparativaDTO
 
 
@@ -338,3 +379,14 @@ class RespuestaBenchmark(BaseModel):
 
     escenarios: list[str]
     filas: list[FilaBenchmark]
+
+
+class RespuestaReglas(BaseModel):
+    """Catálogo completo de reglas expertas y difusas del sistema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total: int = Field(description="Cantidad total de reglas declaradas")
+    expertas: int = Field(description="Reglas crisp de la base de conocimientos")
+    difusas: int = Field(description="Reglas difusas de Mamdani")
+    reglas: list[ReglaSistemaDTO] = Field(description="Definiciones completas en orden declarado")

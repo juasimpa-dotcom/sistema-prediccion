@@ -160,6 +160,7 @@ class SistemaInteligente:
             explicacion=explicacion,
             comparativa=comparativa,
             reglas_disparadas=tuple(paso.regla_id for paso in traza.pasos),
+            reglas_aplicadas=tuple(traza.pasos),
         )
 
     @staticmethod

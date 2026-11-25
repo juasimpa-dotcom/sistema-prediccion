@@ -73,6 +73,8 @@ flowchart TB
   acumula hechos. No hay globales mutables.
 - Las reglas (38) y los parámetros difusos (7 variables, 22 reglas) son datos
   declarativos en `expert_system/reglas.json` y `config.py`.
+- El catálogo combinado (60 reglas) se consulta con `GET /reglas` sin ejecutar
+  inferencia; la traza de una ejecución viaja en `reglas_aplicadas`.
 - El dashboard es un cliente ligero: **no duplica lógica de negocio**.
 
 ---
@@ -267,11 +269,12 @@ python -m core.demo
 ```
 
 Abra <http://localhost:8501>. La pantalla abre con **qué acciones ejecutar esta
-semana**; el detalle técnico está en tres apartados cerrados. Uno de ellos,
-«Cómo se exploraron las opciones», muestra el grafo real de A* y la secuencia de
-evaluaciones. Toda la interfaz usa etiquetas en español. Documentación
-interactiva de la API: <http://localhost:8000/docs> y
-<http://localhost:8000/redoc>.
+semana**; el detalle técnico está en tres apartados cerrados. «Cómo se exploraron
+las opciones» muestra el grafo real de A* y la secuencia de evaluaciones.
+«Comparación y detalle técnico» contiene tres pestañas: comparación de
+algoritmos, reglas aplicadas y catálogo completo de reglas. Toda la interfaz usa
+etiquetas en español. Documentación interactiva de la API:
+<http://localhost:8000/docs> y <http://localhost:8000/redoc>.
 
 ---
 
@@ -287,6 +290,13 @@ interactiva de la API: <http://localhost:8000/docs> y
 | `GET` | `/salud` | Estado del servicio y de los artefactos requeridos. |
 | `GET` | `/catalogos` | Sucursales, categorías y temporadas del dominio. |
 | `GET` | `/benchmark` | Métricas del benchmark de búsqueda. |
+| `GET` | `/reglas` | Catálogo de las 60 reglas (38 expertas y 22 difusas) con condición y conclusión en español; solo lectura. |
+
+`GET /reglas` no ejecuta inferencia: devuelve la base cacheada en
+`app.state.base_reglas`, inyectable al crear la aplicación con
+`crear_app(base_reglas=...)`. Las respuestas de análisis incluyen
+`reglas_aplicadas`, la traza real de reglas disparadas y reglas difusas
+activadas. `reglas_disparadas` se conserva por compatibilidad.
 
 Ejemplo:
 
@@ -314,8 +324,18 @@ son opcionales. La pantalla muestra, en este orden:
    SHAP, justificación del plan y restricciones.
 4. **«Cómo se exploraron las opciones»** (cerrado): grafo interactivo y línea de
    tiempo con la traza real de estados creados, evaluados y descartados.
-5. **«Comparación y detalle técnico»** (cerrado): benchmark de algoritmos,
-   reglas disparadas y aporte de ML frente al experto difuso.
+5. **«Comparación y detalle técnico»** (cerrado): tres pestañas internas —
+   comparación de algoritmos, reglas aplicadas y todas las reglas del sistema—
+   más la comparativa entre ML y experto difuso.
+
+En «¿Por qué esta decisión?» cada causa se explica en palabras con certeza
+alta, media o baja y una palanca que permite o bloquea una acción. En la pestaña
+de comparación, el texto responde quién da el plan más barato, quién es más
+rápido y quién no llega a la meta; el gráfico es solo apoyo. En «Reglas
+aplicadas» cada fila trae orden, origen, código, nombre legible, condición SI,
+conclusión ENTONCES, certeza y prioridad (o fuerza de activación en las difusas).
+«Todas las reglas del sistema» muestra el catálogo completo y no ejecuta ninguna
+regla.
 
 La URL de la API se cambia en la barra lateral; por defecto es
 `http://localhost:8000`. Para una guía de presentación, ver
@@ -344,8 +364,10 @@ Resultados del cierre de Fase 8:
 | Cobertura `expert_system/` | 97 % |
 | Cobertura `search/` | 97 % |
 
-Tras la instrumentación de la traza y el rediseño del dashboard, `pytest -q`
-reporta **272 pruebas superadas**, con `black --check` y `ruff check` en verde.
+Tras la instrumentación de la traza, el rediseño del dashboard y la exposición
+de reglas, `pytest -q` reporta **279 pruebas superadas**, con `black --check` y
+`ruff check` en verde. Las pruebas nuevas cubren `GET /reglas`, la inyección de
+la base, el campo `reglas_aplicadas` y los traductores de reglas y causas.
 
 Para solo los paquetes exigidos por la materia:
 
@@ -389,7 +411,9 @@ sistema_prediccion/
 │   ├── esquemas.py              # Modelos Pydantic estrictos
 │   ├── dependencias.py          # Servicio y repositorio desde app.state
 │   └── mapeado.py               # Proyección del resultado de núcleo a API
-├── app/dashboard.py             # Dashboard Streamlit
+├── app/
+│   ├── dashboard.py             # Dashboard Streamlit
+│   └── visualizacion.py         # Traductores, causas en palabras y figuras de la traza
 ├── notebooks/eda_ventas.py      # Análisis exploratorio
 ├── tests/                       # Pruebas con pytest
 ├── docs/                        # Documentación y artefactos
@@ -433,7 +457,7 @@ El dashboard se muestra en vivo siguiendo los comandos de la sección
 
 | Documento | Contenido |
 | --------- | --------- |
-| [`docs/INFORME.md`](docs/INFORME.md) | Informe ejecutivo: decisión de la semana, uso en 3 pasos, guion de 5 minutos, preguntas frecuentes y anexo técnico breve. |
+| [`docs/INFORME.md`](docs/INFORME.md) | Informe ejecutivo: decisión de la semana, uso en 3 pasos, guion de 5 minutos, pestañas del detalle técnico, preguntas frecuentes y anexo breve. |
 | [`docs/commonkads.md`](docs/commonkads.md) | Modelos de organización, tareas, agentes, conocimiento (38 reglas), comunicación y diseño; adquisición con fuentes simuladas. |
 | [`docs/INFORME_TECNICO.md`](docs/INFORME_TECNICO.md) | Informe técnico completo, resultados y tabla de trazabilidad Temas 1-3. |
 | [`docs/guion_demo.md`](docs/guion_demo.md) | Guion de demostración en vivo de 10 minutos. |
