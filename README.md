@@ -266,10 +266,12 @@ python -m core.demo
 .\venv\Scripts\python.exe -m streamlit run app/dashboard.py --server.port 8501
 ```
 
-Abra <http://localhost:8501>. La pestaña «Exploración de estados» muestra el
-grafo real de A* y la secuencia de evaluaciones; el resto de la interfaz usa
-etiquetas en español. Documentación interactiva de la API:
-<http://localhost:8000/docs> y <http://localhost:8000/redoc>.
+Abra <http://localhost:8501>. La pantalla abre con **qué acciones ejecutar esta
+semana**; el detalle técnico está en tres apartados cerrados. Uno de ellos,
+«Cómo se exploraron las opciones», muestra el grafo real de A* y la secuencia de
+evaluaciones. Toda la interfaz usa etiquetas en español. Documentación
+interactiva de la API: <http://localhost:8000/docs> y
+<http://localhost:8000/redoc>.
 
 ---
 
@@ -301,19 +303,23 @@ Se puede cambiar con `$env:API_CORS_ORIGINS = "http://localhost:8501,http://loca
 
 ## Dashboard
 
-La interfaz permite elegir sucursal y categoría, ajustar el escenario
-(factor de meta, cobertura de stock, afluencia, merma, precio frente a la
-competencia) y muestra:
+La interfaz está pensada para una decisión en menos de 30 segundos. En la barra
+lateral se eligen sucursal, categoría, meta y presupuesto; los datos observados
+son opcionales. La pantalla muestra, en este orden:
 
-- histórico real frente a la proyección;
-- semáforo de riesgo y causas con barras de certeza;
-- plan de acciones con costo y restricciones;
-- explicación con gráfico SHAP;
-- pestañas de comparación de algoritmos, traza de reglas y comparativa
-  simbólico vs. no simbólico.
+1. **Decisión de esta semana**: acciones recomendadas e inversión estimada.
+2. **Cuatro cifras**: ventas proyectadas, meta, cumplimiento y riesgo, con una
+   frase de contexto.
+3. **«¿Por qué esta decisión?»** (cerrado): causas, riesgo difuso, histórico,
+   SHAP, justificación del plan y restricciones.
+4. **«Cómo se exploraron las opciones»** (cerrado): grafo interactivo y línea de
+   tiempo con la traza real de estados creados, evaluados y descartados.
+5. **«Comparación y detalle técnico»** (cerrado): benchmark de algoritmos,
+   reglas disparadas y aporte de ML frente al experto difuso.
 
 La URL de la API se cambia en la barra lateral; por defecto es
-`http://localhost:8000`.
+`http://localhost:8000`. Para una guía de presentación, ver
+[`docs/INFORME.md`](docs/INFORME.md).
 
 ---
 
@@ -337,6 +343,9 @@ Resultados del cierre de Fase 8:
 | Cobertura total | 91 % |
 | Cobertura `expert_system/` | 97 % |
 | Cobertura `search/` | 97 % |
+
+Tras la instrumentación de la traza y el rediseño del dashboard, `pytest -q`
+reporta **272 pruebas superadas**, con `black --check` y `ruff check` en verde.
 
 Para solo los paquetes exigidos por la materia:
 
@@ -385,7 +394,8 @@ sistema_prediccion/
 ├── tests/                       # Pruebas con pytest
 ├── docs/                        # Documentación y artefactos
 │   ├── commonkads.md            # Los seis modelos CommonKADS
-│   ├── informe.md               # Informe técnico y trazabilidad
+│   ├── INFORME.md               # Informe ejecutivo y guion de 5 minutos
+│   ├── INFORME_TECNICO.md       # Informe técnico y trazabilidad
 │   ├── guion_demo.md            # Guion de demostración de 10 minutos
 │   ├── metricas_modelo.json     # Métricas y calibración
 │   ├── benchmark_busqueda.md    # Tablas y verificación de optimalidad
@@ -423,8 +433,9 @@ El dashboard se muestra en vivo siguiendo los comandos de la sección
 
 | Documento | Contenido |
 | --------- | --------- |
+| [`docs/INFORME.md`](docs/INFORME.md) | Informe ejecutivo: decisión de la semana, uso en 3 pasos, guion de 5 minutos, preguntas frecuentes y anexo técnico breve. |
 | [`docs/commonkads.md`](docs/commonkads.md) | Modelos de organización, tareas, agentes, conocimiento (38 reglas), comunicación y diseño; adquisición con fuentes simuladas. |
-| [`docs/informe.md`](docs/informe.md) | Informe técnico completo, resultados y tabla de trazabilidad Temas 1-3. |
+| [`docs/INFORME_TECNICO.md`](docs/INFORME_TECNICO.md) | Informe técnico completo, resultados y tabla de trazabilidad Temas 1-3. |
 | [`docs/guion_demo.md`](docs/guion_demo.md) | Guion de demostración en vivo de 10 minutos. |
 | [`docs/metricas_modelo.json`](docs/metricas_modelo.json) | Métricas, calibración y columnas del modelo. |
 | [`docs/benchmark_busqueda.md`](docs/benchmark_busqueda.md) | Resultados del benchmark y verificación de optimalidad. |
@@ -473,4 +484,4 @@ El dashboard se muestra en vivo siguiendo los comandos de la sección
 
 **Licencia / uso académico.** Proyecto desarrollado como trabajo de Inteligencia
 Artificial. Los datos y expertos son simulados; véanse las limitaciones en
-`docs/informe.md`.
+`docs/INFORME_TECNICO.md`.

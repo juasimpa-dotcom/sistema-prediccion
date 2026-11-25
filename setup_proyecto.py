@@ -45,7 +45,7 @@ ARCHIVOS = {
     "app/dashboard.py": '"""Dashboard Streamlit."""\n',
     # Docs
     "docs/commonkads.md": "# Ingeniería del conocimiento (CommonKADS simplificado)\n",
-    "docs/informe.md": "# Informe del proyecto\n",
+    "docs/INFORME_TECNICO.md": "# Informe del proyecto\n",
     # Raíz
     "README.md": "# Sistema inteligente de predicción del rendimiento de ventas\n",
     ".gitignore": "venv/\n__pycache__/\n*.pyc\n.ipynb_checkpoints/\n.env\nmodels/*.joblib\n.vscode/\n",

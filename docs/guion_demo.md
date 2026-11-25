@@ -156,7 +156,10 @@ con:
 ```
 
 **Navegador:** <http://localhost:8501>. Cambiar la categoría a `embutidos` y
-mostrar el semáforo, las barras de certeza y la pestaña de comparativa Tema 1.
+mostrar primero la decisión y las cuatro cifras; después abrir los apartados
+«¿Por qué esta decisión?» y «Comparación y detalle técnico» para ver causas,
+SHAP y comparativa Tema 1. Para una versión de 5 minutos, seguir
+[`INFORME.md`](INFORME.md).
 
 **Decir:**
 
@@ -198,7 +201,7 @@ Métrica ML de apoyo: **MAE 2 298,48 Bs**, **23,72 % mejor** que la línea base.
 > limitación principal es que datos y expertos son simulados; el trabajo futuro
 > es repetir la elicitación con personal real."
 
-**Si sobra tiempo:** mostrar `docs/informe.md` §13 (trazabilidad) y
+**Si sobra tiempo:** mostrar `docs/INFORME_TECNICO.md` §13 (trazabilidad) y
 `docs/commonkads.md` §5 (las 38 reglas).
 
 ---

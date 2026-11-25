@@ -24,7 +24,7 @@ sistema_prediccion/
   api/ (main.py)
   app/ (dashboard.py)
   tests/
-  docs/ (commonkads.md, informe.md)
+  docs/ (commonkads.md, INFORME_TECNICO.md)
   notebooks/
   requirements.txt, README.md
 

@@ -278,8 +278,10 @@ a A*; `explicacion.py` compone las cinco secciones; `sistema.py` orquesta;
 `api/dependencias.py` inyecta servicio y repositorio desde `app.state`;
 `api/esquemas.py` define contratos estrictos; `api/mapeado.py` proyecta el
 resultado. `app/dashboard.py` es un cliente Streamlit que consume la API y
-muestra histórico, riesgo, causas, plan, explicación SHAP y tres pestañas de
-comparación.
+muestra primero la decisión semanal y cuatro cifras de contexto; el histórico,
+el riesgo, las causas, la explicación SHAP, la traza real de estados, las reglas
+y la comparativa quedan en tres apartados desplegables. El resumen para la
+presentación está en [`INFORME.md`](INFORME.md).
 
 ---
 

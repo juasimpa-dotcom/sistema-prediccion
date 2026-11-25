@@ -301,7 +301,7 @@ flowchart LR
 
 | Flujo | Emisor → receptor | Formato | Momento |
 | ----- | ----------------- | ------- | ------- |
-| Escenario | Usuario → dashboard → API | `SolicitudAnalisis` (Pydantic) | Al pulsar "Analizar". |
+| Escenario | Usuario → dashboard → API | `SolicitudAnalisis` (Pydantic) | Al pulsar "Calcular plan". |
 | Datos | API → fachada → memoria | `ContextoNegocio`, `Hecho` | Inicio de `ejecutar`. |
 | Predicción | Predictor → memoria | `PrediccionVentas` + CF | Tras el modelo. |
 | Fuzzificación | SistemaDifuso → memoria | Hechos con CF = pertenencia | Antes del motor. |
@@ -341,7 +341,7 @@ acumula estado.
 - La heurística de A* es admisible y consistente; se verifica contra costo
   uniforme en `docs/benchmark_busqueda.md`.
 - Cubierta de pruebas superior al 80 % en los paquetes `expert_system/` y
-  `search/`; ver `docs/informe.md`.
+  `search/`; ver `docs/INFORME_TECNICO.md`.
 
 **Mantenimiento previsto.** Para añadir una regla basta un nuevo objeto en
 `reglas.json` con id único; las pruebas de carga validan su forma. Para cambiar
